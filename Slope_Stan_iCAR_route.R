@@ -3,6 +3,7 @@
 library(bbsBayes)
 library(tidyverse)
 library(rstan)
+rstan_options(auto_write = TRUE)
 library(shinystan)
 library(sf)
 library(spdep)
@@ -31,7 +32,7 @@ firstYear = 1995
 species_list = c("Bobolink",
                  "Eastern Meadowlark",
                  "Chimney Swift",
-                 "Chestnut-collared Longspur",
+                 "Baird's Sparrow",
                  "Sprague's Pipit")
 
 
@@ -148,13 +149,17 @@ nb_db = poly2nb(vintj,row.names = vintj$route,queen = FALSE)
 ## many regions may  have > 2 neighbours because of the symmetry condition
 # nb_db <- spdep::knn2nb(spdep::knearneigh(coords,k = 4),row.names = route_map$route,sym = TRUE)
 cc = st_coordinates(st_centroid(vintj))
-plot(nb_db,cc,col = "red")
+#
 
 ggp = ggplot(data = route_map)+
   geom_sf(data = vintj,alpha = 0.3)+
   geom_sf(aes(col = strat))+
   geom_sf_text(aes(label = routeF),size = 3,alpha = 0.3)
+pdf(file = paste0("output/",species,"route maps.pdf"))
+plot(nb_db,cc,col = "red")
 print(ggp)
+dev.off()
+
 
 # wca = which(grepl(route_map$strat,pattern = "-CA-",fixed = T))
 # wak = which(grepl(route_map$strat,pattern = "-AK-",fixed = T))
@@ -205,8 +210,8 @@ stime = system.time(slope_stanfit <-
                                               max_treedepth = 15)))
 
 
-save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map"),
-     file = "output/PAWR_slope_route_iCAR.RData")
+save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_strata_map"),
+     file = paste0("output/",species,"_slope_route_iCAR.RData"))
 
                   }
 
@@ -247,14 +252,14 @@ loo2 = data.frame(loo_1$pointwise)
 loo2$flag = cut(loo2$influence_pareto_k,breaks = c(0,0.5,0.7,1,Inf))
 dts = data.frame(count = stan_data$count,
                  obser = stan_data$obser,
-                 strat = stan_data$strat,
+                 route = stan_data$route,
                  year = stan_data$year)
 loo2 = cbind(loo2,dts)
 
 plot(log(loo2$count+1),loo2$influence_pareto_k)
 
 obserk = loo2 %>% group_by(obser) %>% 
-  summarise(n = n(),
+  summarise(n = log(n()),
             mean_k = mean(influence_pareto_k),
             max_k = max(influence_pareto_k),
             sd_k = sd(influence_pareto_k),
@@ -273,27 +278,122 @@ yeark = loo2 %>% group_by(year) %>%
             q90 = quantile(influence_pareto_k,0.9),
             max_k = max(influence_pareto_k),
             sd_k = sd(influence_pareto_k),
-            strat = mean(strat),
-            sd = sd(strat))
+            route = mean(route),
+            sd = sd(route))
 plot(yeark$year,yeark$max_k)
 plot(yeark$year,yeark$mean_k)
 plot(yeark$year,yeark$sd_k)
 plot(yeark$year,yeark$q90)
 
-stratk = loo2 %>% group_by(strat) %>% 
+routek = loo2 %>% group_by(route) %>% 
   summarise(n = n(),
             mean_k = mean(influence_pareto_k),
             q90_k = quantile(influence_pareto_k,0.9),
             max_k = max(influence_pareto_k),
             sd_k = sd(influence_pareto_k),
-            strat = mean(strat),
-            sd = sd(strat))
-plot(stratk$strat,stratk$max_k)
-plot(stratk$n,stratk$mean_k)
+            route = mean(route),
+            sd = sd(route))
+plot(routek$route,routek$max_k)
+plot(routek$n,routek$mean_k)
 
-plot(stratk$strat,stratk$mean_k)
-plot(stratk$strat,stratk$sd_k)
-plot(stratk$strat,stratk$q90_k)
+plot(routek$route,routek$mean_k)
+plot(routek$route,routek$sd_k)
+plot(routek$route,routek$q90_k)
 
 
+for(species in species_list){
+  
+  if(file.exists(paste0("output/",species,"_slope_route_iCAR.RData"))){
+
+    load(paste0("output/",species,"_slope_route_iCAR.RData"))
+    ### may be removed after re-running
+    
+    laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
+    
+    locat = system.file("maps",
+                        package = "bbsBayes")
+    map.file = "BBS_CWS_strata"
+    
+    strata_map = read_sf(dsn = locat,
+                         layer = map.file)
+    strata_map = st_transform(strata_map,crs = laea)
+    
+    real_strata_map = filter(strata_map,ST_12 %in% unique(jags_data$strat_name))
+    
+    strata_list <- data.frame(ST_12 = unique(jags_data$strat_name),
+                              strat = unique(jags_data$strat))
+    
+    
+    real_strata_map <- inner_join(real_strata_map,strata_list, by = "ST_12")
+    
+    
+    ####
+# add trend and abundance ----------------------------------------
+
+beta_samples = gather_draws(slope_stanfit,beta[s])
+
+slopes = beta_samples %>% group_by(s) %>% 
+  summarise(b = mean(.value),
+            lci = quantile(.value,0.025),
+            uci = quantile(.value,0.975),
+            sd = sd(.value),
+            prec = 1/var(.value),
+            .groups = "keep")
+
+alpha_samples = gather_draws(slope_stanfit,alpha[s])
+interc = alpha_samples %>% group_by(s) %>% 
+  summarise(abund = mean(exp(.value)),
+            lci_i = quantile(exp(.value),0.025),
+            uci_i = quantile(exp(.value),0.975),
+            sd_i = sd(exp(.value)),
+            prec_i = 1/var(.value),
+            .groups = "keep")
+
+#plot(log(interc$i),slopes$b)
+slops_int = inner_join(slopes,interc,by = "s")
+slops_int$routeF = slops_int$s
+
+
+
+
+# connect trends to original route names ----------------------------------
+
+route_map_out = left_join(route_map,slops_int,by = "routeF")
+
+# add mapping of trends ---------------------------------------------------
+
+
+breaks <- c(-0.07, -0.04, -0.02, -0.01, -0.005, 0.005, 0.01, 0.02, 0.04, 0.07)
+labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+labls = paste0(labls, " slope")
+route_map_out$Tplot <- cut(route_map_out$b,breaks = c(-Inf, breaks, Inf),labels = labls)
+map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
+                 "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
+names(map_palette) <- labls
+
+
+tmap = ggplot(route_map_out)+
+  geom_sf(data = real_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(aes(colour = Tplot,size = abund))+
+  scale_colour_manual(values = map_palette, aesthetics = c("colour"),
+                      guide = guide_legend(reverse=TRUE),
+                      name = paste0("slope\n",firstYear,"-",2019))+
+  labs(title = paste(species,"trend-slopes by route (size = mean abundance)"))
+# Send to Courtney --------------------------------------------------------
+
+
+pdf(file = paste0("figures/",species,"trend_map_route.pdf"),
+    height = 8.5,
+    width = 11)
+
+print(tmap)
+
+dev.off()
+
+write.csv(route_map_out,
+          file = paste0("output/",species,"trends_and_intercepts.csv"))
+
+
+  }
+}
 
