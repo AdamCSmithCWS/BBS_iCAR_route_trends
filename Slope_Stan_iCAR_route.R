@@ -22,7 +22,7 @@ pkgs = c("bbsBayes","tidyverse",
 # load and stratify CASW data ---------------------------------------------
 #species = "Pacific Wren"
 #species = "Barred Owl"
-strat = "bbs_cws"
+strat = "bbs_usgs"
 model = "slope"
 
 strat_data = stratify(by = strat)
@@ -33,7 +33,13 @@ species_list = c("Bobolink",
                  "Eastern Meadowlark",
                  "Chimney Swift",
                  "Baird's Sparrow",
-                 "Sprague's Pipit")
+                 "Sprague's Pipit",
+                 "Common Nighthawk",
+                 "Canada Warbler",
+                 "Blackpoll Warbler",
+                 "Bank Swallow",
+                 "Purple Martin",
+                 "Barn Swallow")
 
 
 # parallel setup ----------------------------------------------------------
@@ -60,21 +66,8 @@ jags_data = prepare_jags_data(strat_data = strat_data,
                              species_to_run = species,
                              model = model,
                              #n_knots = 10,
-                             min_year = firstYear)
-
-
-stan_data = jags_data[c("ncounts",
-                         #"nstrata",
-                         #"nobservers",
-                         "count",
-                         #"strat",
-                         #"obser",
-                         "year",
-                         "firstyr",
-                         "fixedyear")]
-stan_data[["nyears"]] <- max(jags_data$year)
-stan_data[["observer"]] <- as.integer(factor((jags_data$ObsN)))
-stan_data[["nobservers"]] <- max(stan_data$observer)
+                             min_year = firstYear,
+                             min_n_routes = 1)
 
 
 # spatial neighbourhood define --------------------------------------------
@@ -82,7 +75,7 @@ laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord refe
 
 locat = system.file("maps",
                     package = "bbsBayes")
-map.file = "BBS_CWS_strata"
+map.file = "BBS_USGS_strata"
 
 strata_map = read_sf(dsn = locat,
                      layer = map.file)
@@ -110,11 +103,15 @@ route_map = unique(data.frame(route = jags_data$route,
 
 # reconcile duplicate spatial locations -----------------------------------
 dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
-if(length(dups) > 0){
+while(length(dups) > 0){
   route_map[dups,"Latitude"] <- route_map[dups,"Latitude"]+0.01 #=0.01 decimal degrees ~ 1km
   route_map[dups,"Longitude"] <- route_map[dups,"Longitude"]+0.01 #=0.01 decimal degrees ~ 1km
+  dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
   
 }
+#dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
+
+
 route_map = st_as_sf(route_map,coords = c("Longitude","Latitude"))
 st_crs(route_map) <- 4269 #NAD83 commonly used by US federal agencies
 #load strata map
@@ -154,7 +151,8 @@ cc = st_coordinates(st_centroid(vintj))
 ggp = ggplot(data = route_map)+
   geom_sf(data = vintj,alpha = 0.3)+
   geom_sf(aes(col = strat))+
-  geom_sf_text(aes(label = routeF),size = 3,alpha = 0.3)
+  geom_sf_text(aes(label = routeF),size = 3,alpha = 0.3)+
+  theme(legend.position = "none")
 pdf(file = paste0("output/",species,"route maps.pdf"))
 plot(nb_db,cc,col = "red")
 print(ggp)
@@ -175,13 +173,32 @@ car_stan_dat <- mungeCARdata4stan(adjBUGS = nb_info$adj,
 
 
 
+
+stan_data = jags_data[c("ncounts",
+                        #"nstrata",
+                        #"nobservers",
+                        "count",
+                        #"strat",
+                        #"obser",
+                        "year",
+                        "firstyr",
+                        "fixedyear")]
+stan_data[["nyears"]] <- max(jags_data$year)
+stan_data[["observer"]] <- as.integer(factor((jags_data$ObsN)))
+stan_data[["nobservers"]] <- max(stan_data$observer)
+
+
+
 stan_data[["N_edges"]] = car_stan_dat$N_edges
 stan_data[["node1"]] = car_stan_dat$node1
 stan_data[["node2"]] = car_stan_dat$node2
 stan_data[["route"]] = jags_data$routeF
 stan_data[["nroutes"]] = max(jags_data$routeF)
 
-mod.file = "models/slope_iCAR_route.stan"
+
+if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
+
+mod.file = "models/slope_iCAR_route_alt.stan"
 
 parms = c("sdnoise",
           "sdobs",
@@ -198,8 +215,7 @@ parms = c("sdnoise",
 slope_model = stan_model(file=mod.file)
 
 ## run sampler on model, data
-stime = system.time(slope_stanfit <-
-                      sampling(slope_model,
+slope_stanfit <- sampling(slope_model,
                                data=stan_data,
                                verbose=TRUE, refresh=100,
                                chains=3, iter=900,
@@ -207,7 +223,7 @@ stime = system.time(slope_stanfit <-
                                cores = 3,
                                pars = parms,
                                control = list(adapt_delta = 0.8,
-                                              max_treedepth = 15)))
+                                              max_treedepth = 15))
 
 
 save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_strata_map"),
@@ -227,7 +243,6 @@ stopCluster(cl = cluster)
 # post loop analysis ------------------------------------------------------
 
 
-paste(stime[[3]]/3600,"hours")
 
 launch_shinystan(slope_stanfit) 
 
@@ -301,6 +316,11 @@ plot(routek$route,routek$sd_k)
 plot(routek$route,routek$q90_k)
 
 
+
+
+# plotting and trend output -----------------------------------------------
+
+library(tidybayes)
 for(species in species_list){
   
   if(file.exists(paste0("output/",species,"_slope_route_iCAR.RData"))){
@@ -312,7 +332,7 @@ for(species in species_list){
     
     locat = system.file("maps",
                         package = "bbsBayes")
-    map.file = "BBS_CWS_strata"
+    map.file = "BBS_USGS_strata"
     
     strata_map = read_sf(dsn = locat,
                          layer = map.file)
