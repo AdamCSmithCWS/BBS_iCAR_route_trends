@@ -27,7 +27,8 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1995
+firstYear = 1966
+lastYear = 1990
 
 species_list = c("Bobolink",
                  "Eastern Meadowlark",
@@ -41,24 +42,42 @@ species_list = c("Bobolink",
                  "Purple Martin",
                  "Barn Swallow")
 
+species_list = c("Brown-headed Cowbird",
+                 "Vesper Sparrow",
+                 "Red-winged Blackbird",
+                 "Eastern Kingbird",
+                 "Killdeer",
+                 "Northern Harrier",
+                 "Savannah Sparrow",
+                 "Western Meadowlark",
+                 "American Kestrel",
+                 "Bobolink",
+                 "Horned Lark",
+                 "Grasshopper Sparrow",
+                 "Baird's Sparrow",
+                 "Eastern Meadowlark",
+                 "Sprague's Pipit",
+                 "Chestnut-collared Longspur",
+                 "Golden-winged Warbler")
+
 
 # parallel setup ----------------------------------------------------------
 
 
 ####
-n_cores <- 5
-cluster <- makeCluster(n_cores,type = "PSOCK")
-registerDoParallel(cluster)
+# n_cores <- 5
+# cluster <- makeCluster(n_cores,type = "PSOCK")
+# registerDoParallel(cluster)
 
 # nspecies <- length(allspecies.eng)
 
+for(species in species_list[1:3]){
 
+# allsum <- foreach(species = species_list,
+#                   .packages = pkgs,
+#                   .inorder = FALSE,
+#                   .errorhandling = "pass") %dopar% {
 
-allsum <- foreach(species = species_list,
-                  .packages = pkgs,
-                  .inorder = FALSE,
-                  .errorhandling = "pass") %dopar% {
-                    
                     # for(ssi in which(allspecies.eng %in% speciestemp2)){
                     
 
@@ -67,6 +86,7 @@ jags_data = prepare_jags_data(strat_data = strat_data,
                              model = model,
                              #n_knots = 10,
                              min_year = firstYear,
+                             max_year = lastYear,
                              min_n_routes = 1)
 
 
@@ -153,7 +173,7 @@ ggp = ggplot(data = route_map)+
   geom_sf(aes(col = strat))+
   geom_sf_text(aes(label = routeF),size = 3,alpha = 0.3)+
   theme(legend.position = "none")
-pdf(file = paste0("output/",species,"route maps.pdf"))
+pdf(file = paste0("output/",species,"route maps ",firstYear," ",lastYear,".pdf"))
 plot(nb_db,cc,col = "red")
 print(ggp)
 dev.off()
@@ -198,7 +218,7 @@ stan_data[["nroutes"]] = max(jags_data$routeF)
 
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
 
-mod.file = "models/slope_iCAR_route_alt.stan"
+mod.file = "models/slope_iCAR_route.stan"
 
 parms = c("sdnoise",
           "sdobs",
@@ -214,22 +234,27 @@ parms = c("sdnoise",
 ## compile model
 slope_model = stan_model(file=mod.file)
 
+print(species)
 ## run sampler on model, data
 slope_stanfit <- sampling(slope_model,
                                data=stan_data,
                                verbose=TRUE, refresh=100,
-                               chains=3, iter=900,
+                               chains=4, iter=900,
                                warmup=600,
-                               cores = 3,
+                               cores = 4,
                                pars = parms,
                                control = list(adapt_delta = 0.8,
                                               max_treedepth = 15))
 
 
 save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_strata_map"),
-     file = paste0("output/",species,"_slope_route_iCAR.RData"))
+     file = paste0("output/",species,"",firstYear," ",lastYear,"_slope_route_iCAR.RData"))
 
-                  }
+}
+
+
+
+
 
 stopCluster(cl = cluster)
 
@@ -321,6 +346,8 @@ plot(routek$route,routek$q90_k)
 # plotting and trend output -----------------------------------------------
 
 library(tidybayes)
+
+
 for(species in species_list){
   
   if(file.exists(paste0("output/",species,"_slope_route_iCAR.RData"))){
@@ -402,7 +429,7 @@ tmap = ggplot(route_map_out)+
 # Send to Courtney --------------------------------------------------------
 
 
-pdf(file = paste0("figures/",species,"trend_map_route.pdf"),
+pdf(file = paste0("figures/",species,firstYear,"trend_map_route.pdf"),
     height = 8.5,
     width = 11)
 
@@ -411,7 +438,7 @@ print(tmap)
 dev.off()
 
 write.csv(route_map_out,
-          file = paste0("output/",species,"trends_and_intercepts.csv"))
+          file = paste0("output/",species," ",firstYear," ",lastYear,"trends_and_intercepts.csv"))
 
 
   }
