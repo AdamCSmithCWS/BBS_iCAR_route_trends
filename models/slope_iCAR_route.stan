@@ -37,8 +37,7 @@ data {
 
 parameters {
   vector[ncounts] noise_raw;             // over-dispersion
-  real lambda[ncounts];             // Poisson means
-  
+
   vector[nroutes] beta_raw;
   real BETA; 
 
@@ -58,7 +57,10 @@ parameters {
   
 }
 
-transformed parameters { 
+
+model {
+
+
   vector[ncounts] E;           // log_scale additive likelihood
   vector[nroutes] beta;
   vector[nroutes] alpha;
@@ -75,10 +77,9 @@ transformed parameters {
     E[i] =  beta[route[i]] * (year[i]-fixedyear) + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
   }
   
-  }
   
-model {
-
+  
+  
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
   noise_raw ~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
   
@@ -101,15 +102,31 @@ model {
   beta_raw ~ icar_normal_lpdf(nroutes, node1, node2);
   alpha_raw ~ icar_normal_lpdf(nroutes, node1, node2);
 
-  //sum to zero constraints
-  sum(alpha_raw) ~ normal(0,0.001*nroutes);
-  sum(beta_raw) ~ normal(0,0.001*nroutes);
-  
+
 }
 
  generated quantities {
 
      vector[ncounts] log_lik;
+     
+       vector[ncounts] E;           // log_scale additive likelihood
+  vector[nroutes] beta;
+  vector[nroutes] alpha;
+  vector[nobservers] obs;
+  vector[ncounts] noise;
+
+// covariate effect on intercepts and slopes
+   beta = (sdbeta*beta_raw) + BETA;
+   alpha = (sdalpha*alpha_raw) + ALPHA;
+   noise = sdnoise*noise_raw;
+   obs = sdobs*obs_raw;
+
+  for(i in 1:ncounts){
+    E[i] =  beta[route[i]] * (year[i]-fixedyear) + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
+  }
+  
+  
+  
   for(i in 1:ncounts){
   log_lik[i] = poisson_log_lpmf(count[i] | E[i]);
   }
