@@ -27,8 +27,8 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1966
-lastYear = 1990
+firstYear = 1990
+lastYear = 2019
 
 species_list = c("Bobolink",
                  "Eastern Meadowlark",
@@ -424,12 +424,12 @@ tmap = ggplot(route_map_out)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
-                      name = paste0("slope\n",firstYear,"-",2019))+
+                      name = paste0("slope\n",firstYear,"-",lastYear))+
   labs(title = paste(species,"trend-slopes by route (size = mean abundance)"))
 # Send to Courtney --------------------------------------------------------
 
 
-pdf(file = paste0("figures/",species,firstYear,"trend_map_route.pdf"),
+pdf(file = paste0("figures/",species,firstYear,"_",lastYear,"trend_map_route.pdf"),
     height = 8.5,
     width = 11)
 
