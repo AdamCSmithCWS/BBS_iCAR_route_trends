@@ -27,8 +27,8 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1990
-lastYear = 2019
+firstYear = 1966
+lastYear = 1999
 
 species_list = c("Bobolink",
                  "Eastern Meadowlark",
@@ -246,9 +246,11 @@ slope_stanfit <- sampling(slope_model,
                                control = list(adapt_delta = 0.8,
                                               max_treedepth = 15))
 
+out_file <- paste0("output/",species,"",firstYear," ",lastYear,"_slope_route_iCAR.RData")
+
 
 save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_strata_map"),
-     file = paste0("output/",species,"",firstYear," ",lastYear,"_slope_route_iCAR.RData"))
+     file = out_file)
 
 }
 
@@ -349,10 +351,11 @@ library(tidybayes)
 
 
 for(species in species_list){
+  out_file <- paste0("output/",species,"",firstYear," ",lastYear,"_slope_route_iCAR.RData")
   
-  if(file.exists(paste0("output/",species,"_slope_route_iCAR.RData"))){
+  if(file.exists(out_file)){
 
-    load(paste0("output/",species,"_slope_route_iCAR.RData"))
+    load(out_file)
     ### may be removed after re-running
     
     laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
