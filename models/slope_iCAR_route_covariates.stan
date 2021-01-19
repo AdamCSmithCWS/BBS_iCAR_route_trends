@@ -18,7 +18,7 @@ data {
   int<lower=1> ncounts;
   int<lower=1> nyears;
   int<lower=1> nobservers;
-  // int<lower=1> n_c_alpha; //number of intercept covariates
+   int<lower=1> n_c_alpha; //number of intercept covariates
   int<lower=1> n_c_beta; //number of slope covariates
  
   int<lower=0> count[ncounts];              // count observations
@@ -40,17 +40,17 @@ data {
   //route-level quadratic covariates on slopes
   matrix[nroutes,n_c_beta] beta_covs2;
 
-  // //route-level covariates on intercepts
-  // matrix[nroutes,n_c_alpha] alpha_covs;
-  // //route-level quadratic covariates on intercepts
-  // matrix[nroutes,n_c_alpha] alpha_covs2;
+   //route-level covariates on intercepts
+   matrix[nroutes,n_c_alpha] alpha_covs;
+   //route-level quadratic covariates on intercepts
+   matrix[nroutes,n_c_alpha] alpha_covs2;
 
 }
 
 parameters {
 
-  // vector[n_c_alpha] c_alpha; //covariate parameters on the intercepts
-  // vector[n_c_alpha] c_alpha2; //covariate quadratic parameters on the intercepts
+   vector[n_c_alpha] c_alpha; //covariate parameters on the intercepts
+   vector[n_c_alpha] c_alpha2; //covariate quadratic parameters on the intercepts
 
   vector[n_c_beta] c_beta;  // covariate parameters on the slopes
   vector[n_c_beta] c_beta2;  // covariate quadratic parameters on the slopes
@@ -87,7 +87,7 @@ model {
   vector[nobservers] obs;
   vector[ncounts] noise;
   vector[nroutes] sum_beta;
-//  vector[nroutes] sum_alpha;
+  vector[nroutes] sum_alpha;
 
 
 //weakly informative normal priors assuming standardized predictors
@@ -96,11 +96,17 @@ model {
      
 
     sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
-   
+     
+     c_alpha ~ std_normal();
+     c_alpha2 ~ normal(0,0.1);
+     
+
+    sum_alpha = alpha_covs * c_alpha + alpha_covs2 * c_alpha2;  //summary of the covariate effects on trends
+    
    
 // spatial and covariate effects on intercepts and slopes
    beta = (sdbeta*beta_raw) + sum_beta + BETA;
-   alpha = (sdalpha*alpha_raw) + ALPHA;
+   alpha = (sdalpha*alpha_raw) + sum_alpha + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
  
@@ -148,12 +154,14 @@ model {
   vector[nobservers] obs;
   vector[ncounts] noise;
   vector[nroutes] sum_beta;
+  vector[nroutes] sum_alpha;
 
     sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
-
+   sum_alpha = alpha_covs * c_alpha + alpha_covs2 * c_alpha2;  //summary of the covariate effects on trends
+  
 // covariate effect on intercepts and slopes
    beta = (sdbeta*beta_raw) + sum_beta + BETA;
-   alpha = (sdalpha*alpha_raw) + ALPHA;
+   alpha = (sdalpha*alpha_raw) + sum_alpha + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
 
