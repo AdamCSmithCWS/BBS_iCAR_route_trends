@@ -3,7 +3,7 @@
 library(bbsBayes)
 library(tidyverse)
 library(rstan)
-rstan_options(auto_write = TRUE)
+rstan_options(auto_write = TRUE,javascript = FALSE)
 library(shinystan)
 library(sf)
 library(spdep)
@@ -27,7 +27,7 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1990
+firstYear = 1995
 lastYear = 2019
 
 species_list = c("Bobolink",
@@ -75,8 +75,9 @@ species_list = c("Bobolink",
 
                     # for(ssi in which(allspecies.eng %in% speciestemp2)){
                     
-for(species in species_list){
+#for(species in species_list){
   
+species = species_list[1]
 
 # removing the non-Canadian data ------------------------------------------
   names_strata <- get_composite_regions(strata_type = strat) ## bbsBayes function that gets a list of the strata names and their composite regions (provinces, BCRs, etc.)
@@ -253,9 +254,12 @@ fps[,paste0("sc_",j1,"_2")] = (fps[,paste0("sc_",j1)]^2)-mean(unlist(fps[,paste0
 }
 
 
-all_cov <- left_join(route_map,fps,by = c("route" = "rt.uni"))
+all_cov <- as.data.frame(left_join(route_map,fps,by = c("route" = "rt.uni")))
 
-beta_covs <- as.matrix(all_cov[,paste0("sc_",fp_covs)])
+
+
+beta_covs <- as.matrix((all_cov[,paste0("sc_",fp_covs)]))
+
 beta_covs2 <- as.matrix(all_cov[,paste0("sc_",fp_covs,"_2")])
 n_c_beta <- length(fp_covs)
 
@@ -290,9 +294,9 @@ print(species)
 slope_stanfit <- sampling(slope_model,
                                data=stan_data,
                                verbose=TRUE, refresh=100,
-                               chains=1, iter=450,
-                               warmup=400,
-                               cores = 1,
+                               chains=3, iter=900,
+                               warmup=600,
+                               cores = 3,
                                pars = parms,
                                control = list(adapt_delta = 0.8,
                                               max_treedepth = 15))
@@ -301,13 +305,13 @@ slope_stanfit <- sampling(slope_model,
 save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_strata_map"),
      file = paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR.RData"))
 
-}
+#}
 
 
 
 
 
-stopCluster(cl = cluster)
+#stopCluster(cl = cluster)
 
 
 

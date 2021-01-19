@@ -95,7 +95,7 @@ model {
      c_beta2 ~ normal(0,0.1);
      
 
-    sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  
+    sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
    
    
 // spatial and covariate effects on intercepts and slopes
@@ -147,9 +147,12 @@ model {
   vector[nroutes] alpha;
   vector[nobservers] obs;
   vector[ncounts] noise;
+  vector[nroutes] sum_beta;
+
+    sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
 
 // covariate effect on intercepts and slopes
-   beta = (sdbeta*beta_raw) + BETA;
+   beta = (sdbeta*beta_raw) + sum_beta + BETA;
    alpha = (sdalpha*alpha_raw) + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
