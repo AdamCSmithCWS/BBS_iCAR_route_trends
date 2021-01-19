@@ -222,6 +222,53 @@ if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from 
 
 mod.file = "models/slope_iCAR_route_covariates.stan"
 
+
+# setting up covariate data -----------------------------------------------
+
+load("covariate_data/compiled_footprint_data.RData")
+# 
+# #select scale for intercepts
+# # buffer_sizes
+# # [1] "400m" "1km"  "2km"  "3km"  "4km"  "5km" 
+sc = buffer_sizes[2] #1km
+# 
+# 
+# #select canadian footprint variable
+# # fp_components
+# # [1] "cumulative"                   "built"                        "crop"                         "dam_and_associated_reservoir" "forestry_harvest"             "mines"                       
+# # [7] "nav_water"                    "night_lights"                 "oil_gas"                      "pasture"                      "population_density"           "rail"                        
+# # [13] "roads"
+fp_covs = fp_components[c(1,10)] #cumulative and pasture
+cov_head = paste(fp_covs,sc,"mean",sep = "_")
+
+fps = fp_can_by_route[,c("rt.uni",cov_head)]
+
+### scales the linear predictor, 
+
+for(j in 1:length(fp_covs)){
+  j2 = cov_head[j]
+  j1 = fp_covs[j]
+fps[,paste0("sc_",j1)] = scale(fps[,j2]) ## scales the linear predictor
+fps[,paste0("sc_",j1,"_2")] = (fps[,paste0("sc_",j1)]^2)-mean(unlist(fps[,paste0("sc_",j1)]^2)) ## creates the polynomial, then centers
+}
+
+
+all_cov <- left_join(route_map,fps,by = c("route" = "rt.uni"))
+
+beta_covs <- as.matrix(all_cov[,paste0("sc_",fp_covs)])
+beta_covs2 <- as.matrix(all_cov[,paste0("sc_",fp_covs,"_2")])
+n_c_beta <- length(fp_covs)
+
+
+stan_data[["beta_covs"]] <- beta_covs
+stan_data[["beta_covs2"]] <- beta_covs2
+stan_data[["n_c_beta"]] <- n_c_beta
+
+
+
+# model fitting -----------------------------------------------------------
+
+
 parms = c("sdnoise",
           "sdobs",
           "sdbeta",
@@ -231,7 +278,9 @@ parms = c("sdnoise",
           "ALPHA",
           "beta",
           "eta",
-          "log_lik")
+          "log_lik",
+          "c_beta",
+          "c_beta2")
 
 ## compile model
 slope_model = stan_model(file=mod.file)
@@ -241,9 +290,9 @@ print(species)
 slope_stanfit <- sampling(slope_model,
                                data=stan_data,
                                verbose=TRUE, refresh=100,
-                               chains=4, iter=900,
-                               warmup=600,
-                               cores = 4,
+                               chains=1, iter=450,
+                               warmup=400,
+                               cores = 1,
                                pars = parms,
                                control = list(adapt_delta = 0.8,
                                               max_treedepth = 15))
