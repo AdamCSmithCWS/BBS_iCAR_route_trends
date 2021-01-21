@@ -77,22 +77,108 @@ species_list = c("Bobolink",
                     
 #for(species in species_list){
   
-species = species_list[1]
+species = species_list[2]
 
-# removing the non-Canadian data ------------------------------------------
-  names_strata <- get_composite_regions(strata_type = strat) ## bbsBayes function that gets a list of the strata names and their composite regions (provinces, BCRs, etc.)
+
+# setting up covariate data -----------------------------------------------
   
-  us_strata_remove <- names_strata[which(names_strata$national == "US"),"region"] # character vector of the strata names to remove from data
+  
+#getting list of the routes in the data
+
+  rt_list = unique(strat_data$route_strat[,c("strat_name","rt.uni")])
+  
+  
+  load("covariate_data/compiled_footprint_data.RData")
+  # 
+  # #select scale for intercepts
+  # # buffer_sizes
+  # # [1] "400m" "1km"  "2km"  "3km"  "4km"  "5km" 
+  sc = buffer_sizes[2] #1km
+  # 
+  # 
+  # #select canadian footprint variable
+  # # fp_components
+  # # [1] "cumulative"                   "built"                        "crop"                         "dam_and_associated_reservoir" "forestry_harvest"             "mines"                       
+  # # [7] "nav_water"                    "night_lights"                 "oil_gas"                      "pasture"                      "population_density"           "rail"                        
+  # # [13] "roads"
+  
+  
+  
+  # slope covariates --------------------------------------------------------
+  
+  #slope covariates - change in footprint uisng global footprint layers 2000 - 2013
+  vl_val = "mean" #alternate is "p_above" = proportion of landscape above a threshold FP value
+  cls = paste(vl_val,sc,sep = "_")
+  
+  covs_sel <- fp_global_by_route[,c("rt.uni","year",cls)]
+  covs_sel[,"y1"] <- covs_sel[,cls]
+  covs_sel[,"x1"] <- covs_sel[,"year"]
+  
+  chng_fxn = function(x,y){
+    s = as.numeric(coefficients(lm(y ~ x))["x"])
+    s = s*diff(range(x))
+    return(s)
+  }
+  
+  # tmp = covs_sel[which(covs_sel$rt.uni == "11-13"),]
+  
+  fp_change <- covs_sel %>% filter(!is.na(x1) & !is.na(y1)) %>% 
+    group_by(rt.uni) %>% 
+    summarise(Global_FP_Change = chng_fxn(x1,y1))
+  
+ 
+  # intercept covariates ----------------------------------------------------
+  fp_covi = fp_components[c(1,10)] #cumulative and pasture
+  covi_head = paste(fp_covi,sc,"mean",sep = "_")
+  
+  fpi = fp_can_by_route[,c("rt.uni",covi_head)]
+  
+  all_covs1 = inner_join(fpi,fp_change)
+  
+  all_covs = inner_join(rt_list,all_covs1,by = c("rt.uni"))
+ 
+  
+  ### identifying which covariates are for slope and intercepts
+  cov_names_slopes = c(covi_head[1],"Global_FP_Change")
+  
+  cov_names_intercepts = covi_head
+  
+# Modifying the object created by bbsBayes stratify() function
+# that is removing data from routes with no covariates ----------------------------
+
+  strat_data$route_strat <- strat_data$route_strat[which(strat_data$route_strat$rt.uni %in% all_covs$rt.uni),]
+  strat_data$bird_strat <- strat_data$bird_strat[which(strat_data$bird_strat$rt.uni %in% all_covs$rt.uni),]
+  
+  
   jags_data = prepare_jags_data(strat_data = strat_data,
                              species_to_run = species,
                              model = model,
                              #n_knots = 10,
                              min_year = firstYear,
                              max_year = lastYear,
-                             min_n_routes = 1,
-                             strata_rem = us_strata_remove) # this final argument removes all data from the US
-### now just hte Canadian data remain.
+                             min_n_routes = 1) # 
+### now just the BBS data with covariates remain.
 
+ 
+ #  #### alternative approach that specifically removes the US data
+ #  #### not necessary here, because only the Canadian data have covariate info, so US data already removed
+ #  
+ #   # removing the non-Canadian data ------------------------------------------
+ #  names_strata <- get_composite_regions(strata_type = strat) ## bbsBayes function that gets a list of the strata names and their composite regions (provinces, BCRs, etc.)
+ #  
+ #  us_strata_remove <- names_strata[which(names_strata$national == "US"),"region"] # character vector of the strata names to remove from data
+ #  
+ #  
+ # jags_data = prepare_jags_data(strat_data = strat_data,
+ #                                species_to_run = species,
+ #                                model = model,
+ #                                #n_knots = 10,
+ #                                min_year = firstYear,
+ #                                max_year = lastYear,
+ #                                min_n_routes = 1,
+ #                                strata_rem = us_strata_remove) # this final argument removes all data from the US
+ #  ### now just hte Canadian data remain.
+ #  
 # spatial neighbourhood define --------------------------------------------
 laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
 
@@ -122,6 +208,41 @@ route_map = unique(data.frame(route = jags_data$route,
                               strat = jags_data$strat_name,
                               Latitude = jags_data$Latitude,
                               Longitude = jags_data$Longitude))
+
+all_covs <- inner_join(route_map,all_covs,by = c("route" = "rt.uni")) %>% 
+  arrange(routeF)
+
+
+if(nrow(all_covs) != max(route_map$routeF)){stop("Error - missing bird or covariate data")}
+
+
+cov_names = names(all_covs)[7:ncol(all_covs)]
+
+### scales the predictors, 
+
+for(j in 1:length(cov_names)){
+  j1 = cov_names[j]
+  all_covs[,paste0("sc_",j1)] = scale(all_covs[,j1]) ## scales the linear predictor
+  all_covs[,paste0("sc_",j1,"_2")] = (all_covs[,paste0("sc_",j1)]^2)-mean(unlist(all_covs[,paste0("sc_",j1)]^2)) ## creates the polynomial, then centers
+}
+
+# merge the covariates with BBS data --------------------------------------
+
+beta_covs <- as.matrix((all_covs[,paste0("sc_",cov_names_slopes)]))
+
+beta_covs2 <- as.matrix(all_covs[,paste0("sc_",cov_names_slopes,"_2")])
+n_c_beta <- length(cov_names_slopes)
+
+
+
+
+alpha_covs <- as.matrix((all_covs[,paste0("sc_",cov_names_intercepts)]))
+
+alpha_covs2 <- as.matrix(all_covs[,paste0("sc_",cov_names_intercepts,"_2")])
+n_c_alpha <- length(cov_names_intercepts)
+
+
+
 
 
 # reconcile duplicate spatial locations -----------------------------------
@@ -219,54 +340,20 @@ stan_data[["route"]] = jags_data$routeF
 stan_data[["nroutes"]] = max(jags_data$routeF)
 
 
+stan_data[["beta_covs"]] <- beta_covs
+#stan_data[["beta_covs2"]] <- beta_covs2
+stan_data[["n_c_beta"]] <- n_c_beta
+
+
+stan_data[["alpha_covs"]] <- alpha_covs
+#stan_data[["alpha_covs2"]] <- alpha_covs2
+stan_data[["n_c_alpha"]] <- n_c_alpha
+
+
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
 
 mod.file = "models/slope_iCAR_route_covariates.stan"
 
-
-# setting up covariate data -----------------------------------------------
-
-load("covariate_data/compiled_footprint_data.RData")
-# 
-# #select scale for intercepts
-# # buffer_sizes
-# # [1] "400m" "1km"  "2km"  "3km"  "4km"  "5km" 
-sc = buffer_sizes[2] #1km
-# 
-# 
-# #select canadian footprint variable
-# # fp_components
-# # [1] "cumulative"                   "built"                        "crop"                         "dam_and_associated_reservoir" "forestry_harvest"             "mines"                       
-# # [7] "nav_water"                    "night_lights"                 "oil_gas"                      "pasture"                      "population_density"           "rail"                        
-# # [13] "roads"
-fp_covs = fp_components[c(1,10)] #cumulative and pasture
-cov_head = paste(fp_covs,sc,"mean",sep = "_")
-
-fps = fp_can_by_route[,c("rt.uni",cov_head)]
-
-### scales the linear predictor, 
-
-for(j in 1:length(fp_covs)){
-  j2 = cov_head[j]
-  j1 = fp_covs[j]
-fps[,paste0("sc_",j1)] = scale(fps[,j2]) ## scales the linear predictor
-fps[,paste0("sc_",j1,"_2")] = (fps[,paste0("sc_",j1)]^2)-mean(unlist(fps[,paste0("sc_",j1)]^2)) ## creates the polynomial, then centers
-}
-
-
-all_cov <- as.data.frame(left_join(route_map,fps,by = c("route" = "rt.uni")))
-
-
-
-beta_covs <- as.matrix((all_cov[,paste0("sc_",fp_covs)]))
-
-beta_covs2 <- as.matrix(all_cov[,paste0("sc_",fp_covs,"_2")])
-n_c_beta <- length(fp_covs)
-
-
-stan_data[["beta_covs"]] <- beta_covs
-stan_data[["beta_covs2"]] <- beta_covs2
-stan_data[["n_c_beta"]] <- n_c_beta
 
 
 
@@ -284,7 +371,8 @@ parms = c("sdnoise",
           "eta",
           "log_lik",
           "c_beta",
-          "c_beta2")
+          #"c_beta2",
+          "sum_beta")
 
 ## compile model
 slope_model = stan_model(file=mod.file)
@@ -294,16 +382,16 @@ print(species)
 slope_stanfit <- sampling(slope_model,
                                data=stan_data,
                                verbose=TRUE, refresh=100,
-                               chains=3, iter=900,
-                               warmup=600,
+                               chains=3, iter=1300,
+                               warmup=1000,
                                cores = 3,
                                pars = parms,
-                               control = list(adapt_delta = 0.8,
+                               control = list(adapt_delta = 0.99,
                                               max_treedepth = 15))
 
 
 save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_strata_map"),
-     file = paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR.RData"))
+     file = paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_covariate_route_iCAR.RData"))
 
 #}
 
@@ -324,7 +412,7 @@ save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_
 
 
 # 
-# launch_shinystan(slope_stanfit) 
+ launch_shinystan(slope_stanfit) 
 # 
 # 
 # library(loo)

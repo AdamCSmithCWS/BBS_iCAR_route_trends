@@ -27,8 +27,8 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1966
-lastYear = 1999
+firstYear = 1998
+lastYear = 2019
 
 species_list = c("Bobolink",
                  "Eastern Meadowlark",

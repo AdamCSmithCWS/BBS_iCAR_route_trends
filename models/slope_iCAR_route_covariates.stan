@@ -38,22 +38,22 @@ data {
   //route-level covariates on slopes
   matrix[nroutes,n_c_beta] beta_covs;
   //route-level quadratic covariates on slopes
-  matrix[nroutes,n_c_beta] beta_covs2;
+//  matrix[nroutes,n_c_beta] beta_covs2;
 
    //route-level covariates on intercepts
    matrix[nroutes,n_c_alpha] alpha_covs;
    //route-level quadratic covariates on intercepts
-   matrix[nroutes,n_c_alpha] alpha_covs2;
+ //  matrix[nroutes,n_c_alpha] alpha_covs2;
 
 }
 
 parameters {
 
    vector[n_c_alpha] c_alpha; //covariate parameters on the intercepts
-   vector[n_c_alpha] c_alpha2; //covariate quadratic parameters on the intercepts
+  // vector[n_c_alpha] c_alpha2; //covariate quadratic parameters on the intercepts
 
   vector[n_c_beta] c_beta;  // covariate parameters on the slopes
-  vector[n_c_beta] c_beta2;  // covariate quadratic parameters on the slopes
+ // vector[n_c_beta] c_beta2;  // covariate quadratic parameters on the slopes
 
  
   vector[ncounts] noise_raw;             // over-dispersion
@@ -91,43 +91,30 @@ model {
 
 
 //weakly informative normal priors assuming standardized predictors
-    c_beta ~ std_normal();
-     c_beta2 ~ normal(0,0.1);
+    c_beta ~ normal(0,0.1);
+//     c_beta2 ~ normal(0,0.05);
      
 
-    sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
-     
-     c_alpha ~ std_normal();
-     c_alpha2 ~ normal(0,0.1);
+    sum_beta = beta_covs * c_beta;// + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
+  
+     c_alpha ~ normal(0,0.1);
+//     c_alpha2 ~ normal(0,0.05); //not sure why these polynomial terms aren't working...
      
 
-    sum_alpha = alpha_covs * c_alpha + alpha_covs2 * c_alpha2;  //summary of the covariate effects on trends
-    
-   
-// spatial and covariate effects on intercepts and slopes
-   beta = (sdbeta*beta_raw) + sum_beta + BETA;
-   alpha = (sdalpha*alpha_raw) + sum_alpha + ALPHA;
-   noise = sdnoise*noise_raw;
-   obs = sdobs*obs_raw;
+    sum_alpha = alpha_covs * c_alpha;// + alpha_covs2 * c_alpha2;  //summary of the covariate effects on trends
  
 
-
-  for(i in 1:ncounts){
-    E[i] =  beta[route[i]] * (year[i]-fixedyear) + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
-  }
   
-  
-  
-  
-  sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
-  noise_raw ~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
+  sdnoise ~ gamma(2,3);//boundary avoiding prior on sd
+  // sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
+  noise_raw ~ student_t(4,0,1); //heavy tailed extra Poisson variance
+  sum(noise_raw) ~ normal(0,0.0001*ncounts);
   
   sdobs ~ std_normal(); //prior on sd of gam hyperparameters
  
   obs_raw ~ normal(0,1);//observer effects
   sum(obs_raw) ~ normal(0,0.001*nobservers);
 
-  count ~ poisson_log(E); //vectorized count likelihood with log-transformation
   
   BETA ~ normal(0,0.1);// prior on fixed effect mean slope
   ALPHA ~ normal(0,1);// prior on fixed effect mean intercept
@@ -141,6 +128,21 @@ model {
   beta_raw ~ icar_normal_lpdf(nroutes, node1, node2);
   alpha_raw ~ icar_normal_lpdf(nroutes, node1, node2);
 
+
+// spatial and covariate effects on intercepts and slopes
+   beta = (sdbeta*beta_raw) + sum_beta + BETA;
+   alpha = (sdalpha*alpha_raw) + sum_alpha + ALPHA;
+   noise = sdnoise*noise_raw;
+   obs = sdobs*obs_raw;
+ 
+
+
+  for(i in 1:ncounts){
+    E[i] =  beta[route[i]] * (year[i]-fixedyear) + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
+  }
+  
+   count ~ poisson_log(E); //vectorized count likelihood with log-transformation
+ 
 
 }
 
@@ -156,8 +158,8 @@ model {
   vector[nroutes] sum_beta;
   vector[nroutes] sum_alpha;
 
-    sum_beta = beta_covs * c_beta + beta_covs2 * c_beta2;  //summary of the covariate effects on trends
-   sum_alpha = alpha_covs * c_alpha + alpha_covs2 * c_alpha2;  //summary of the covariate effects on trends
+    sum_beta = beta_covs * c_beta ;//+ beta_covs2 * c_beta2;  //summary of the covariate effects on trends
+ sum_alpha = alpha_covs * c_alpha ;//+ alpha_covs2 * c_alpha2;  //summary of the covariate effects on trends
   
 // covariate effect on intercepts and slopes
    beta = (sdbeta*beta_raw) + sum_beta + BETA;
