@@ -27,7 +27,7 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1990
+firstYear = 1995
 lastYear = 2019
 
 species_list = c("Bobolink",
@@ -220,7 +220,7 @@ stan_data[["nroutes"]] = max(jags_data$routeF)
 
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
 
-mod.file = "models/slope_iCAR_route_covariates.stan"
+mod.file = "models/slope_iCAR_route.stan"
 
 parms = c("sdnoise",
           "sdobs",
@@ -258,7 +258,7 @@ save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_
 
 
 
-stopCluster(cl = cluster)
+#stopCluster(cl = cluster)
 
 
 
