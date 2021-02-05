@@ -396,7 +396,7 @@ save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_
 #}
 
 
-
+load(paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_covariate_route_iCAR.RData"))
 
 
 #stopCluster(cl = cluster)

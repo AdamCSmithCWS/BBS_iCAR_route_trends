@@ -3,14 +3,14 @@
 library(bbsBayes)
 library(tidyverse)
 library(rstan)
-rstan_options(auto_write = TRUE)
+rstan_options(auto_write = TRUE, javascript = FALSE)
 library(shinystan)
 library(sf)
 library(spdep)
 library(doParallel)
 library(foreach)
-# library(ggforce)
-# library(tidybayes)
+ library(ggforce)
+library(tidybayes)
 source("functions/mungeCARdata4stan.R")
 source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
 ## changes captured in a commit on Nov 20, 2020
@@ -27,7 +27,7 @@ model = "slope"
 
 strat_data = stratify(by = strat)
 
-firstYear = 1995
+firstYear = 2004
 lastYear = 2019
 
 species_list = c("Bobolink",
@@ -59,6 +59,19 @@ species_list = c("Bobolink",
                  "Chestnut-collared Longspur",
                  "Golden-winged Warbler")
 
+allspecies.eng = strat_data$species_strat$english
+
+species_list = allspecies.eng[-which(allspecies.eng %in% species_list)]
+
+
+
+# removing the non-Canadian data ------------------------------------------
+
+names_strata <- get_composite_regions(strata_type = strat) ## bbsBayes function that gets a list of the strata names and their composite regions (provinces, BCRs, etc.)
+
+us_strata_remove <- names_strata[which(names_strata$national == "US"),"region"] # character vector of the strata names to remove from data
+
+
 
 # optional parallel setup ----------------------------------------------------------
 # n_cores <- 5
@@ -75,22 +88,28 @@ species_list = c("Bobolink",
 
                     # for(ssi in which(allspecies.eng %in% speciestemp2)){
                     
-for(species in species_list){
+for(species in rev(allspecies.eng)){
+  
+  sp_file <- paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
+  if(file.exists(sp_file)){next}
+    
+  if(grepl(pattern = "hybrid",x = species)){next}
+  if(grepl(pattern = " x ",x = species)){next}
+  if(grepl(pattern = "/",fixed = TRUE,x = species)){next}
+  if(substr(x = species,1,1) == "("){next}
   
 
-# removing the non-Canadian data ------------------------------------------
-  names_strata <- get_composite_regions(strata_type = strat) ## bbsBayes function that gets a list of the strata names and their composite regions (provinces, BCRs, etc.)
-  
-  us_strata_remove <- names_strata[which(names_strata$national == "US"),"region"] # character vector of the strata names to remove from data
-  jags_data = prepare_jags_data(strat_data = strat_data,
+ jags_data = try(prepare_jags_data(strat_data = strat_data,
                              species_to_run = species,
                              model = model,
                              #n_knots = 10,
                              min_year = firstYear,
                              max_year = lastYear,
                              min_n_routes = 1,
-                             strata_rem = us_strata_remove) # this final argument removes all data from the US
+                             strata_rem = us_strata_remove),silent = TRUE) # this final argument removes all data from the US
 ### now just hte Canadian data remain.
+ if(class(jags_data) == "try-error"){next}
+ if(jags_data$ncounts < 500){next}
 
 # spatial neighbourhood define --------------------------------------------
 laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
@@ -189,6 +208,7 @@ dev.off()
 
 nb_info = spdep::nb2WB(nb_db)
 
+if(min(nb_info$num) == 0){next}
 ### re-arrange GEOBUGS formated nb_info into appropriate format for Stan model
 car_stan_dat <- mungeCARdata4stan(adjBUGS = nb_info$adj,
                                   numBUGS = nb_info$num)
@@ -236,7 +256,7 @@ parms = c("sdnoise",
 ## compile model
 slope_model = stan_model(file=mod.file)
 
-print(species)
+print(paste(firstYear,species))
 ## run sampler on model, data
 slope_stanfit <- sampling(slope_model,
                                data=stan_data,
@@ -258,7 +278,7 @@ save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_
 
 
 
-#stopCluster(cl = cluster)
+ #stopCluster(cl = cluster)
 
 
 
@@ -345,19 +365,25 @@ save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_
 # 
 
 
-# plotting and trend output -----------------------------------------------
+# PLOTTING and trend output -----------------------------------------------
 
-library(tidybayes)
+# library(tidybayes)
 
 
-for(species in species_list){
+route_trajectories <- FALSE #set to FALSE to speed up mapping
+
+maps = vector(mode = "list",length = 100)
+jj <- 0
+trends_out <- NULL
+
+for(species in allspecies.eng){
   
   sp_file <- paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
   if(file.exists(sp_file)){
 
     load(sp_file)
     ### may be removed after re-running
-    
+    jj <- jj+1
     laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
     
     locat = system.file("maps",
@@ -406,10 +432,109 @@ slops_int$routeF = slops_int$s
 
 
 
+# Route-level trajectories ------------------------------------------------
+if(route_trajectories){
+sdnoise_samples = gather_draws(slope_stanfit,sdnoise)%>% 
+  ungroup() %>% 
+  select(.draw,.value) %>% 
+  rename(sdnoise = .value)
+
+
+
+beta_samples <- beta_samples %>% 
+  ungroup() %>% 
+  select(s,.draw,.value) %>% 
+  rename(beta = .value)
+  
+alpha_samples <- alpha_samples %>% 
+  ungroup() %>% 
+  select(s,.draw,.value) %>% 
+  rename(alpha = .value)
+
+ab_samples = inner_join(beta_samples,alpha_samples)
+
+ab_samples = left_join(ab_samples,sdnoise_samples,by = ".draw")
+
+nyears = stan_data$nyears
+fixedyear = stan_data$fixedyear
+YEARS = c(min(jags_data$r_year):max(jags_data$r_year))
+
+if(length(YEARS) != nyears){stop("years don't match YEARS =",length(YEARS),"nyears =",nyears)}
+
+ind_fxn = function(a,b,sdn,y,fy){
+  i = exp(a + b*(y-fy) + (0.5*(sdn^2)))
+  return(i)
+}
+
+i_samples = NULL
+for(yr in 1:nyears){
+  i_t = ab_samples %>% 
+    mutate(i = ind_fxn(alpha,beta,sdnoise,yr,fixedyear),
+           y = yr,
+           year = YEARS[yr])
+  i_samples <- bind_rows(i_samples,i_t)
+}
+
+indices = i_samples %>% group_by(s,y,year) %>% 
+  summarise(index = mean(i),
+            lci_i = quantile(i,0.025),
+            uci_i = quantile(i,0.975),
+            sd_i = sd(i),
+            .groups = "keep")
+
+raw = data.frame(s = stan_data$route,
+                 y = stan_data$year,
+                 count = stan_data$count,
+                 obs = stan_data$observer)
+indices = left_join(indices,raw,by = c("y","s"))
+
+rts = route_map %>% tibble() %>% 
+  select(route,routeF,strat) %>% 
+  mutate(s = routeF) 
+
+
+indices = left_join(indices,rts,by = "s")
+indices$obs <- factor(indices$obs)
+nroutes = stan_data$nroutes
+
+# setting up the plot dimensions
+npg = ceiling(nroutes/9)
+ncl = 3
+nrw = 3
+if(npg*9-nroutes < 3){
+  nrw = 2
+  npg = ceiling(nroutes/6) 
+  if(npg*6-nroutes < 3){
+    ncl = 2
+    npg = ceiling(nroutes/4)  
+  }
+}
+#### 
+pdf(paste0("trajectories/",species,"_route_trajectories.pdf"),
+    width = 11,
+    height = 8.5)
+
+for(j in 1:npg){
+traj = ggplot(data = indices,aes(x = year,y = index,colour = strat))+
+  geom_ribbon(aes(ymin = lci_i,ymax = uci_i),alpha = 0.4,fill = grey(0.5))+
+  geom_line()+
+  geom_point(aes(x = year,y = count, colour = obs), fill = grey(0.5),alpha = 0.5,inherit.aes = FALSE)+
+  facet_wrap_paginate(~ strat+route,scales = "free",ncol = ncl,nrow = nrw,page = j)+
+  theme(legend.position = "none")
+try(print(traj),silent = TRUE)
+}
+dev.off()
+
+
+
+}
+
 # connect trends to original route names ----------------------------------
 
 route_map_out = left_join(route_map,slops_int,by = "routeF")
+route_map_out$species <- species
 
+trends_out <- bind_rows(trends_out,route_map_out)
 # add mapping of trends ---------------------------------------------------
 
 
@@ -432,13 +557,10 @@ tmap = ggplot(route_map_out)+
 # Send to Courtney --------------------------------------------------------
 
 
-pdf(file = paste0("figures/",species,firstYear,"_",lastYear,"_Canadian_trend_map_route.pdf"),
-    height = 8.5,
-    width = 11)
 
-print(tmap)
 
-dev.off()
+maps[[jj]] <- tmap
+
 
 write.csv(route_map_out,
           file = paste0("output/",species," ",firstYear," ",lastYear,"_Canadian_trends_and_intercepts.csv"))
@@ -446,4 +568,19 @@ write.csv(route_map_out,
 
   }
 }
+
+
+
+pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_Canadian_trend_map_route.pdf"),
+    height = 8.5,
+    width = 11)
+for(j in 1:length(maps)){
+  if(!is.null(maps[[j]])){print(maps[[j]])}
+}
+dev.off()
+
+write.csv(trends_out,
+          file = paste0("output/combined_",firstYear,"_",lastYear,"_Canadian_trends_and_intercepts.csv"))
+
+
 
