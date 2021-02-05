@@ -372,7 +372,7 @@ save(list = c("slope_stanfit","stan_data","jags_data","vintj","route_map","real_
 
 route_trajectories <- FALSE #set to FALSE to speed up mapping
 
-maps = vector(mode = "list",length = 100)
+maps = vector(mode = "list",length = 300)
 jj <- 0
 trends_out <- NULL
 
@@ -562,8 +562,8 @@ tmap = ggplot(route_map_out)+
 maps[[jj]] <- tmap
 
 
-write.csv(route_map_out,
-          file = paste0("output/",species," ",firstYear," ",lastYear,"_Canadian_trends_and_intercepts.csv"))
+# write.csv(route_map_out,
+#           file = paste0("output/",species," ",firstYear," ",lastYear,"_Canadian_trends_and_intercepts.csv"))
 
 
   }
