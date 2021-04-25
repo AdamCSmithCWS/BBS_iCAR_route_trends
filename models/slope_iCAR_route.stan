@@ -115,6 +115,10 @@ model {
   vector[nobservers] obs;
   vector[ncounts] noise;
 
+  real n_r[nroutes,nyears]; // array of route level annual indices
+  
+  real n[nyears]; // matrix of annual indices by species
+ 
 // covariate effect on intercepts and slopes
    beta = (sdbeta*beta_raw) + BETA;
    alpha = (sdalpha*alpha_raw) + ALPHA;
@@ -126,6 +130,19 @@ model {
   }
   
   
+  
+  // tracking the annual indices of abundance with and without simulated aging of observers
+   for(y in 1:nyears){
+     for(j in 1:nroutes){
+ 
+        n_r[j,y] = exp(beta[j] * (y-fixedyear) + alpha[j] + 0.5*sdobs^2 + 0.5*sdnoise^2);
+    }
+      n[y] = mean(n_r[,y]); //mean count on routes where species is included
+   }
+
+
+
+
   
   for(i in 1:ncounts){
   log_lik[i] = poisson_log_lpmf(count[i] | E[i]);
