@@ -2,3 +2,12 @@
 .Rhistory
 .RData
 .Ruserdata
+Figures/
+models/**.rds
+**arch/
+covariate_data/
+output/
+route_maps/
+tmp_route_data/
+trajectories/
+
