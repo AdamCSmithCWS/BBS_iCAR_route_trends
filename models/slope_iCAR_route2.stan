@@ -90,7 +90,7 @@ model {
 
   
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
-  noise_raw ~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
+  noise_raw ~ normal(0,1); //~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
   
   sdobs ~ std_normal(); //prior on sd of gam hyperparameters
  
@@ -106,11 +106,11 @@ model {
   
   //spatial iCAR intercepts and slopes by strata
   sdalpha ~ normal(0,1); //prior on sd of intercept variation
-  sdbeta_space ~ gamma(2,0.1);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation
-  sdbeta_rand  ~ gamma(2,0.1);//~ normal(0,0.05); //boundary avoiding prior on sd of slope random variation
+  sdbeta_space ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.1 and 99% < 0.33
+  sdbeta_rand  ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope random variation
 
-  beta_raw_space ~ icar_normal_lpdf(nroutes, node1, node2);
-  alpha_raw ~ icar_normal_lpdf(nroutes, node1, node2);
+  beta_raw_space ~ icar_normal(nroutes, node1, node2);
+  alpha_raw ~ icar_normal(nroutes, node1, node2);
 
 
 }
