@@ -58,7 +58,7 @@ us_strata_remove <- names_strata[which(names_strata$national == "US"),"region"] 
 output_dir <- "G:/BBS_iCAR_route_trends/output"
 #output_dir_simp <- "G:/BBS_iCAR_route_trends/output"
 
-species = species_list[748]
+#species = species_list[748]
 
 for(species in rev(allspecies.eng)){
   
@@ -248,7 +248,7 @@ slope_stanfit$save_output_files(dir = output_dir,
                                 random = FALSE,
                                 timestamp = FALSE)
 
-csv_files <- dir(output_dir,"/",pattern = out_base,full.names = TRUE)
+csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
 
 #slope_stanfit$save_object(file = paste0(output_dir,"/",out_base,"_gamye_iCAR.RDS"))
 
