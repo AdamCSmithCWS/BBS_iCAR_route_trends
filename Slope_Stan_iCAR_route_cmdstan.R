@@ -16,6 +16,7 @@ library(spdep)
 source("functions/neighbours_define.R") ## function to define neighbourhood relationships
 source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
 source("functions/get_basemap_function.R") ## loads one of the bbsBayes strata maps
+source("functions/posterior_summary_functions.R") ## functions similar to tidybayes that work on cmdstanr output
 ## changes captured in a commit on Nov 20, 2020
 
 
@@ -54,15 +55,16 @@ us_strata_remove <- names_strata[which(names_strata$national == "US"),"region"] 
 
 # SPECIES LOOP ------------------------------------------------------------
 
-output_dir <- "G:/BBS_iCAR_route_trends/output/"
-output_dir_simp <- "G:/BBS_iCAR_route_trends/output"
+output_dir <- "G:/BBS_iCAR_route_trends/output"
+#output_dir_simp <- "G:/BBS_iCAR_route_trends/output"
 
-species = species_list[745]
+species = species_list[748]
 
 for(species in rev(allspecies.eng)){
   
+  species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
   
-  sp_file <- paste0(output_dir,species,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
+  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
   if(file.exists(sp_file)){next}
     
   #series of if statements that skip analysing hybrids, composite species groups, etc.
@@ -70,6 +72,7 @@ for(species in rev(allspecies.eng)){
   if(grepl(pattern = " x ",x = species)){next}
   if(grepl(pattern = "/",fixed = TRUE,x = species)){next}
   if(substr(x = species,1,1) == "("){next}
+  
   
 
  jags_data = try(prepare_jags_data(strat_data = strat_data,
@@ -237,17 +240,17 @@ slope_stanfit <- slope_model$sample(
   seed = 123,
   init = init_def)
 
-out_base <- paste0(species,"_",scope,"_",firstYear)
+out_base <- paste0(species_f,"_",scope,"_",firstYear)
 
 # export to csv and read in as rstan --------------------------------------
-slope_stanfit$save_output_files(dir = output_dir_simp,
+slope_stanfit$save_output_files(dir = output_dir,
                                 basename = out_base,
                                 random = FALSE,
                                 timestamp = FALSE)
 
-csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
+csv_files <- dir(output_dir,"/",pattern = out_base,full.names = TRUE)
 
-slope_stanfit$save_object(file = paste0(output_dir,out_base,"_gamye_iCAR.RDS"))
+#slope_stanfit$save_object(file = paste0(output_dir,"/",out_base,"_gamye_iCAR.RDS"))
 
 
 
@@ -278,13 +281,17 @@ if(shiny_explore){
 #                                               max_treedepth = 15))
 # 
 
-save(list = c("out_base",
+save(list = c("slope_stanfit",
+              "out_base",
               "stan_data",
               "jags_data",
               "route_map",
               "realized_strata_map",
               "firstYear",
-              "sp_file"),
+              "sp_file",
+              "species_f",
+              "csv_files",
+              "output_dir"),
      file = sp_file)
 
 }
@@ -406,40 +413,56 @@ jj <- 0
 LC = 0.05
 UC = 0.95
 
+output_dir <- "G:/BBS_iCAR_route_trends/output"
+
+
+
 for(species in allspecies.eng){
   
-  sp_file <- paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR2.RData")
+  
+  species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
+  
+  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
+  
+  
+  #sp_file <- paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR2.RData")
   if(file.exists(sp_file)){
 
     load(sp_file)
     ### may be removed after re-running     launch_shinystan(slope_stanfit)
+    sl_rstan <- rstan::read_stan_csv(csv_files)
+    #launch_shinystan(as.shinystan(sl_rstan))
     
+    #loo_stan = loo(sl_rstan)
     
     jj <- jj+1
-    laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
-    
-    locat = system.file("maps",
-                        package = "bbsBayes")
-    map.file = "BBS_USGS_strata"
-    
-    strata_map = read_sf(dsn = locat,
-                         layer = map.file)
-    strata_map = st_transform(strata_map,crs = laea)
-    
-    realized_strata_map = filter(strata_map,ST_12 %in% unique(jags_data$strat_name))
-    
-    strata_list <- data.frame(ST_12 = unique(jags_data$strat_name),
-                              strat = unique(jags_data$strat))
-    
-    
-    realized_strata_map <- inner_join(realized_strata_map,strata_list, by = "ST_12")
-    
+    # laea = st_crs("+proj=laea +lat_0=40 +lon_0=-95") # Lambert equal area coord reference system
+    # 
+    # locat = system.file("maps",
+    #                     package = "bbsBayes")
+    # map.file = "BBS_USGS_strata"
+    # 
+    # strata_map = read_sf(dsn = locat,
+    #                      layer = map.file)
+    # strata_map = st_transform(strata_map,crs = laea)
+    # 
+    # realized_strata_map = filter(strata_map,ST_12 %in% unique(jags_data$strat_name))
+    # 
+    # strata_list <- data.frame(ST_12 = unique(jags_data$strat_name),
+    #                           strat = unique(jags_data$strat))
+    # 
+    # 
+    # realized_strata_map <- inner_join(realized_strata_map,strata_list, by = "ST_12")
+    # 
     
     ####
 # add trend and abundance ----------------------------------------
 
-beta_samples = gather_draws(slope_stanfit,beta[s])
-
+beta_samples = posterior_samples(sl_rstan,"beta",
+                                 dims = "s")
+    # beta_samples2 = posterior_samples(slope_stanfit,"beta",
+    #                                  dims = "s")
+    
 slopes = beta_samples %>% group_by(s) %>% 
   summarise(b = mean(.value),
             lci = quantile(.value,LC),
@@ -448,7 +471,8 @@ slopes = beta_samples %>% group_by(s) %>%
             prec = 1/var(.value),
             .groups = "keep")
 
-alpha_samples = gather_draws(slope_stanfit,alpha[s])
+alpha_samples = posterior_samples(sl_rstan,"alpha",
+                                  dims = "s")
 interc = alpha_samples %>% group_by(s) %>% 
   summarise(abund = mean(exp(.value)),
             lci_i = quantile(exp(.value),LC),
@@ -465,12 +489,12 @@ slops_int$routeF = slops_int$s
 
 # random effect plus mean component of slope ----------------------------------------
 
-# BETA_samples = gather_draws(slope_stanfit,BETA) %>% 
+# BETA_samples = posterior_samples(sl_rstan,BETA) %>% 
 #   rename(BETA = .value) %>% 
 #   ungroup() %>% 
 #   select(BETA,.draw)
 # 
-# beta_rand_samples = gather_draws(slope_stanfit,beta_rand[s]) %>% 
+# beta_rand_samples = posterior_samples(sl_rstan,beta_rand[s]) %>% 
 #   rename(beta_rand = .value) %>% 
 #   ungroup() %>% 
 #   select(beta_rand,.draw,s)
@@ -489,7 +513,9 @@ slops_int$routeF = slops_int$s
 # slopes_rand_full_int$routeF = slopes_rand_full_int$s
 
 
-beta_rand_samples = gather_draws(slope_stanfit,beta_rand[s])
+beta_rand_samples = posterior_samples(sl_rstan,
+                                      "beta_rand",
+                                      dims = "s")
 
 slopes_rand = beta_rand_samples %>% group_by(s) %>% 
   summarise(b = mean(.value),
@@ -506,7 +532,8 @@ slops_rand_int$routeF = slops_rand_int$s
 # spatial component of slope ----------------------------------------
 
 
-beta_space_samples = gather_draws(slope_stanfit,beta_space[s])
+beta_space_samples = posterior_samples(sl_rstan,"beta_space",
+                                       dims = "s")
 
 slopes_space = beta_space_samples %>% group_by(s) %>% 
   summarise(b = mean(.value),
@@ -521,7 +548,14 @@ slops_space_int$routeF = slops_space_int$s
 
 
 # Compare spatial and random variation ------------------------------------
-sdbeta_space_rand_tmp_samples <- gather_draws(slope_stanfit,c(sdbeta_rand,sdbeta_space))
+sdbeta_rand_tmp_samples <- posterior_samples(sl_rstan,
+                                                   "sdbeta_rand")
+sdbeta_space_tmp_samples <- posterior_samples(sl_rstan,
+                                             "sdbeta_space")
+
+sdbeta_space_rand_tmp_samples <- bind_rows(sdbeta_rand_tmp_samples,
+                                           sdbeta_space_tmp_samples)
+
 
   sdbeta_space_rand_tmp <- sdbeta_space_rand_tmp_samples %>% 
   group_by(.variable) %>%
@@ -531,22 +565,23 @@ sdbeta_space_rand_tmp_samples <- gather_draws(slope_stanfit,c(sdbeta_rand,sdbeta
             sd = sd((.value)),
             .groups = "keep") %>% 
   mutate(species = species)
-
+#combines all species estimates
 sdbeta_space_rand <- bind_rows(sdbeta_space_rand,sdbeta_space_rand_tmp)
 
 
 
 # difference rand-spatial -------------------------------------------------
 
-sdbeta_space_tmp_samples <- gather_draws(slope_stanfit,c(sdbeta_space)) %>% 
+sdbeta_space_tmp_samples <- sdbeta_space_tmp_samples %>% 
   rename(sd_space = .value) %>% 
   ungroup() %>% 
   select(-.variable)
 
-sdbeta_rand_tmp_samples <- gather_draws(slope_stanfit,c(sdbeta_rand)) %>% 
+sdbeta_rand_tmp_samples <- sdbeta_rand_tmp_samples %>% 
   rename(sd_rand = .value)%>% 
   ungroup() %>% 
   select(-.variable)
+
 sdbeta_tmp_samples <- inner_join(sdbeta_rand_tmp_samples,sdbeta_space_tmp_samples)
 
 sdbeta_tmp_dif <- sdbeta_tmp_samples %>% 
@@ -565,7 +600,7 @@ sdbeta_dif <- bind_rows(sdbeta_dif,sdbeta_tmp_dif)
 
 # Route-level trajectories ------------------------------------------------
 if(route_trajectories){
-sdnoise_samples = gather_draws(slope_stanfit,sdnoise)%>% 
+sdnoise_samples = posterior_samples(sl_rstan,"sdnoise")%>% 
   ungroup() %>% 
   select(.draw,.value) %>% 
   rename(sdnoise = .value)
@@ -781,7 +816,7 @@ print(species)
 # overall trend maps and trends -------------------------------------------
 
 
-pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_Canadian_trend_map_route2.pdf"),
+pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_",scope,"_trend_map_route2.pdf"),
     height = 8.5,
     width = 11)
 for(j in 1:length(maps)){
@@ -790,7 +825,7 @@ for(j in 1:length(maps)){
 dev.off()
 
 write.csv(trends_out,
-          file = paste0("output/combined_",firstYear,"_",lastYear,"_Canadian_trends_and_intercepts2.csv"))
+          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_trends_and_intercepts2.csv"))
 
 
 
@@ -798,7 +833,7 @@ write.csv(trends_out,
 
 library(patchwork)
 
-pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_Canadian_trend_map_route2_by_half_CI.pdf"),
+pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_",scope,"_trend_map_route2_by_half_CI.pdf"),
     height = 8.5,
     width = 11)
 for(j in 1:length(maps3)){
@@ -806,20 +841,11 @@ for(j in 1:length(maps3)){
 }
 dev.off()
 
-# 
-# pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_Canadian_space_rand_trend_map_route2.pdf"),
-#     width = 8.5,
-#     height = 11)
-# for(j in 1:length(maps)){
-#   if(!is.null(maps[[j]])){
-#     print(maps2[[j]] /(maps_rand[[j]] +maps_space[[j]]))
-#     }
-# }
-# dev.off()
 
 
 
-pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_Canadian_space_all_trend_map_route2.pdf"),
+
+pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_",scope,"_space_all_trend_map_route2.pdf"),
     width = 8.5,
     height = 11)
 for(j in 1:length(maps)){
@@ -832,9 +858,9 @@ dev.off()
 
 
 write.csv(trends_out_space,
-          file = paste0("output/combined_",firstYear,"_",lastYear,"_Canadian_spatial_trends_and_intercepts2.csv"))
+          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_spatial_trends_and_intercepts2.csv"))
 write.csv(trends_out_rand,
-          file = paste0("output/combined_",firstYear,"_",lastYear,"_Canadian_random_trends_and_intercepts2.csv"))
+          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_random_trends_and_intercepts2.csv"))
 
 
 
@@ -856,7 +882,7 @@ var_dif_plot = ggplot(data = sdbeta_difs,aes(x = species,y = mean))+
   theme(axis.text = element_text(size = 5),
         legend.position = "none")+
   coord_flip()
-pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_difference_beta_sd.pdf"),
+pdf(file = paste0("figures/Combined_",firstYear,"_",lastYear,"_",scope,"_difference_beta_sd.pdf"),
 width = 8.5,
 height = 17)
 print(var_dif_plot)

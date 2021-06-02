@@ -152,7 +152,7 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
         geom_sf(data = vintj,alpha = 0,colour = grey(0.95))+ 
         geom_sf(data = real_strata_map,alpha = 0.1)+ 
         geom_sf(aes(col = strat_lab))+
-        geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8)+
+        geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8,colour = grey(0.7))+
         labs(title = species)
       
       if(!is.null(add_map)){
