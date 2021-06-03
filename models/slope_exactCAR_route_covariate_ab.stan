@@ -122,7 +122,8 @@ parameters {
 
   vector[nroutes] alpha_space;
   //real ALPHA; 
-
+  real BETA;
+  real ALPHA;
   real eta; //first-year intercept
   
   vector[nobservers] obs_raw; //observer effects
@@ -134,8 +135,11 @@ parameters {
  //real<lower=0> sdbeta_rand;    // sd of slopes 
   real<lower=0> sdalpha_space;    // sd of intercepts
 
-  vector[nknots_cov] B_cov_raw;         // GAM coefficients
-  real<lower=0> sdcov;
+  vector[nknots_cov] B_cov_raw;         // GAM coefficients slope
+  real<lower=0> sdcov_b;
+
+  vector[nknots_cov] A_cov_raw;         // GAM coefficients intercept
+  real<lower=0> sdcov_a;
 
   //real<lower = 0> tau_alpha; //
   real<lower = 0, upper = 1> a_alpha; //spatial covariance for abundance
@@ -148,11 +152,17 @@ parameters {
 transformed parameters{
     real<lower=0> taubeta_space;    // sd of slopes 
   real<lower=0> taualpha_space;    // sd of intercepts
-  vector[nroutes] cov_smooth;
-  vector[npred_cov] cov_smooth_vis; // basis function matrix to visualize covaraite effect
+  vector[nroutes] cov_smooth_b;
+  vector[npred_cov] cov_smooth_b_vis; // basis function matrix to visualize covaraite effect
 
-  cov_smooth = cov_basis*(sdcov*B_cov_raw);
-  cov_smooth_vis = cov_basispred*(sdcov*B_cov_raw);
+  vector[nroutes] cov_smooth_a;
+  vector[npred_cov] cov_smooth_a_vis; // basis function matrix to visualize covaraite effect
+
+  cov_smooth_b = cov_basis*(sdcov_b*B_cov_raw);
+  cov_smooth_b_vis = cov_basispred*(sdcov_b*B_cov_raw);
+ 
+   cov_smooth_a = cov_basis*(sdcov_a*A_cov_raw);
+  cov_smooth_a_vis = cov_basispred*(sdcov_a*A_cov_raw);
   
 taubeta_space = inv_square(sdbeta_space);
 taualpha_space = inv_square(sdalpha_space);
@@ -170,11 +180,16 @@ model {
   vector[ncounts] noise;
 
 // covariate effect on intercepts and slopes
-  sdcov ~ gamma(2,2);// ~ std_normal();//variance of GAM parameters
+  sdcov_b ~ gamma(2,2);// ~ std_normal();//variance of GAM parameters
   B_cov_raw ~ std_normal();//GAM parameters
-
-   beta = beta_space + cov_smooth;
-   alpha = alpha_space;// + ALPHA;
+  BETA ~ normal(0,0.05);//GAM parameters
+  
+  sdcov_a ~ gamma(2,2);// ~ std_normal();//variance of GAM parameters
+  A_cov_raw ~ std_normal();//GAM parameters
+  ALPHA ~ std_normal();
+  
+   beta = beta_space + cov_smooth_b + BETA;
+   alpha = alpha_space + cov_smooth_a + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
 
@@ -194,7 +209,7 @@ model {
   count ~ poisson_log(E); //vectorized count likelihood with log-transformation
   
   eta ~ normal(0,1);// prior on first-year observer effect
-  a_beta ~ uniform(0,1);//
+  a_beta ~ beta(2,5);//
   a_alpha ~ uniform(0,1);//
 
   //spatial CAR intercepts and slopes by strata

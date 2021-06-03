@@ -254,7 +254,7 @@ stan_data[["nroutes"]] = max(jags_data$routeF)
 
 route_map_df = data.frame(route_map)
 gam_cov = gam_basis(as.numeric(route_map_df[,cls_sel]),
-                    nknots = 6,
+                    nknots = 10,
                     npredpoints = 50,
                     sm_name = "cov")
 
@@ -268,7 +268,7 @@ stan_data[["nknots_cov"]] = gam_cov$nknots_cov
 
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
 
-mod.file = "models/slope_exactCAR_route_covariate.stan"
+mod.file = "models/slope_exactCAR_route_covariate_ab.stan"
 
 # parms = c("sdnoise",
 #           "sdobs",
@@ -306,7 +306,7 @@ slope_model <- cmdstan_model(mod.file)
 
 slope_stanfit <- slope_model$sample(
   data=stan_data,
-  refresh=25,
+  refresh=50,
   chains=3, iter_sampling=1000,
   iter_warmup=1500,
   parallel_chains = 3,

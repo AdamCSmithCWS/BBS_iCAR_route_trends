@@ -56,7 +56,7 @@ data {
   int<lower=1> ncounts;
   int<lower=1> nyears;
   int<lower=1> nobservers;
-  
+ 
   int<lower=0> count[ncounts];              // count observations
   int<lower=1> year[ncounts]; // year index
   int<lower=1> route[ncounts]; // route index
@@ -70,14 +70,6 @@ data {
   matrix<lower = 0, upper = 1>[nroutes, nroutes] W; // adjacency matrix
   int W_n;                // number of adjacent region pairs = sum(W)/2
   
-  
-  // covariate gam smooth information
-  int<lower=1> npred_cov;  // number of prediction points in the covariate
-  int<lower=1> nknots_cov;  // number of knots in the basis function for season
-  matrix[nroutes, nknots_cov] cov_basis; // basis function matrix
-  matrix[npred_cov, nknots_cov] cov_basispred; // basis function matrix to visualize covaraite effect
-
-    
   
 
 }
@@ -119,6 +111,8 @@ parameters {
   vector[ncounts] noise_raw;             // over-dispersion
 
   vector[nroutes] beta_space;
+  vector[nroutes] beta_raw_rand;
+  real BETA; 
 
   vector[nroutes] alpha_space;
   //real ALPHA; 
@@ -131,11 +125,9 @@ parameters {
  //real<lower=1> nu;  //optional heavy-tail df for t-distribution
   real<lower=0> sdobs;    // sd of observer effects
   real<lower=0> sdbeta_space;    // sd of slopes 
- //real<lower=0> sdbeta_rand;    // sd of slopes 
+ real<lower=0> sdbeta_rand;    // sd of slopes 
   real<lower=0> sdalpha_space;    // sd of intercepts
 
-  vector[nknots_cov] B_cov_raw;         // GAM coefficients
-  real<lower=0> sdcov;
 
   //real<lower = 0> tau_alpha; //
   real<lower = 0, upper = 1> a_alpha; //spatial covariance for abundance
@@ -145,35 +137,22 @@ parameters {
   
 }
 
-transformed parameters{
-    real<lower=0> taubeta_space;    // sd of slopes 
-  real<lower=0> taualpha_space;    // sd of intercepts
-  vector[nroutes] cov_smooth;
-  vector[npred_cov] cov_smooth_vis; // basis function matrix to visualize covaraite effect
-
-  cov_smooth = cov_basis*(sdcov*B_cov_raw);
-  cov_smooth_vis = cov_basispred*(sdcov*B_cov_raw);
-  
-taubeta_space = inv_square(sdbeta_space);
-taualpha_space = inv_square(sdalpha_space);
-
-}
-
-
 model {
 
 
   vector[ncounts] E;           // log_scale additive likelihood
+   vector[nroutes] beta_rand;
+  //vector[nroutes] beta_space;
  vector[nroutes] beta;
   vector[nroutes] alpha;
   vector[nobservers] obs;
   vector[ncounts] noise;
 
 // covariate effect on intercepts and slopes
-  sdcov ~ gamma(2,2);// ~ std_normal();//variance of GAM parameters
-  B_cov_raw ~ std_normal();//GAM parameters
-
-   beta = beta_space + cov_smooth;
+   //beta_space = (sdbeta_space*beta_raw_space);
+   beta_rand = (sdbeta_rand*beta_raw_rand);
+   
+   beta = beta_space + beta_rand + BETA;
    alpha = alpha_space;// + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
@@ -182,6 +161,10 @@ model {
     E[i] =  beta[route[i]] * (year[i]-fixedyear) + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
   }
   
+  
+  beta_raw_rand ~ normal(0,1);//random non-spatial variation in slope
+  sum(beta_raw_rand) ~ normal(0,0.001*nroutes);
+
   
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
   noise_raw ~ normal(0,1); //~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
@@ -193,6 +176,8 @@ model {
 
   count ~ poisson_log(E); //vectorized count likelihood with log-transformation
   
+  BETA ~ normal(0,0.1);// prior on fixed effect mean slope
+  //ALPHA ~ normal(0,1);// prior on fixed effect mean intercept
   eta ~ normal(0,1);// prior on first-year observer effect
   a_beta ~ uniform(0,1);//
   a_alpha ~ uniform(0,1);//
@@ -200,9 +185,10 @@ model {
   //spatial CAR intercepts and slopes by strata
   sdalpha_space ~ gamma(2,2);//~ normal(0,1); //prior on sd of intercept variation
   sdbeta_space ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.1 and 99% < 0.33
+  sdbeta_rand  ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope random variation
 
-  beta_space ~ sparse_car(taubeta_space, a_beta, W_sparse, D_sparse, lambda, nroutes, W_n);
-  alpha_space ~ sparse_car(taualpha_space, a_alpha, W_sparse, D_sparse, lambda, nroutes, W_n);
+  beta_space ~ sparse_car(sdbeta_space, a_beta, W_sparse, D_sparse, lambda, nroutes, W_n);
+  alpha_space ~ sparse_car(sdalpha_space, a_alpha, W_sparse, D_sparse, lambda, nroutes, W_n);
 
 
 // vector phi, real tau, real alpha, 
@@ -215,14 +201,18 @@ model {
      vector[ncounts] log_lik;
      
        vector[ncounts] E;           // log_scale additive likelihood
+   vector[nroutes] beta_rand;
+  //vector[nroutes] beta_space;
   vector[nroutes] beta;
   vector[nroutes] alpha;
   vector[nobservers] obs;
   vector[ncounts] noise;
 
 // intercepts and slopes
-
-   beta = beta_space;
+   //beta_space = (sdbeta_space*beta_raw_space);
+   beta_rand = (sdbeta_rand*beta_raw_rand);
+   
+   beta = beta_space + beta_rand + BETA;
     alpha = alpha_space;// + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
