@@ -17,6 +17,7 @@ source("functions/neighbours_define.R") ## function to define neighbourhood rela
 source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
 source("functions/get_basemap_function.R") ## loads one of the bbsBayes strata maps
 source("functions/posterior_summary_functions.R") ## functions similar to tidybayes that work on cmdstanr output
+source("functions/GAM_basis_function_mgcv.R") ## functions to build the GAM smooth basis functions
 ## changes captured in a commit on Nov 20, 2020
 
 
@@ -87,6 +88,63 @@ for(species in rev(allspecies.eng)){
  if(class(jags_data) == "try-error"){next}
  if(jags_data$ncounts < 500){next}
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ # Canadian current footprint data at route-level --------------------------
+ 
+ rt_list = data.frame(rt.uni = unique(jags_data$route))
+ 
+ load("data/compiled_footprint_data.RData")
+ 
+ 
+ buf_sel = buffer_sizes[3] #selecting the 4 km buffer
+ 
+ # fp_components
+ # [1] "cumulative"                   "built"                       
+ # [3] "crop"                         "dam_and_associated_reservoir"
+ # [5] "forestry_harvest"             "mines"                       
+ # [7] "nav_water"                    "night_lights"                
+ # [9] "oil_gas"                      "pasture"                     
+ # [11] "population_density"           "rail"                        
+ # [13] "roads" 
+ 
+ preds <- fp_components[c(1)]
+ 
+ cls_sel <- paste(preds,buf_sel,"mean",sep = "_")
+ cls_sel_i <- c("rt.uni",cls_sel)
+ 
+ 
+ 
+ fp_can_sel <- fp_can_by_route %>% 
+   select(all_of(cls_sel_i)) %>% 
+   na.exclude() %>% 
+   distinct() %>% 
+   #mutate(pred = across(all_of(cls_sel),scale)) %>% 
+   right_join(.,rt_list)
+ 
+ fp_can_sel <- data.frame(fp_can_sel)
+ 
+ 
+ if(any(is.na(fp_can_sel[,cls_sel]))){
+   print(paste(length(which(is.na(fp_can_sel[,cls_sel])))),"routes are missing covariate data for",species)
+   fp_can_sel[which(is.na(fp_can_sel[,cls_sel])),cls_sel] <- mean(fp_can_sel[,cls_sel],na.rm = TRUE)
+ }
+
+ ### also model the covariate as a smooth function.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 # spatial neighbourhood define --------------------------------------------
 
  # strata map of one of the bbsBayes base maps
@@ -122,7 +180,8 @@ route_map = unique(data.frame(route = jags_data$route,
                               routeF = jags_data$routeF,
                               strat = jags_data$strat_name,
                               Latitude = jags_data$Latitude,
-                              Longitude = jags_data$Longitude))
+                              Longitude = jags_data$Longitude)) 
+route_map <- left_join(route_map,fp_can_sel,by = c("route"="rt.uni"))
 
 
 # reconcile duplicate spatial locations -----------------------------------
@@ -186,16 +245,30 @@ stan_data[["nobservers"]] <- max(stan_data$observer)
 
 
 
-stan_data[["N_edges"]] = car_stan_dat$N_edges
-stan_data[["node1"]] = car_stan_dat$node1
-stan_data[["node2"]] = car_stan_dat$node2
+stan_data[["W"]] = car_stan_dat$adj_matrix
+stan_data[["W_n"]] = sum(car_stan_dat$adj_matrix)/2
+
+
 stan_data[["route"]] = jags_data$routeF
 stan_data[["nroutes"]] = max(jags_data$routeF)
+
+route_map_df = data.frame(route_map)
+gam_cov = gam_basis(as.numeric(route_map_df[,cls_sel]),
+                    nknots = 6,
+                    npredpoints = 50,
+                    sm_name = "cov")
+
+stan_data[["cov_basis"]] = gam_cov$cov_basis
+stan_data[["cov_basispred"]] = gam_cov$cov_basispred
+stan_data[["npred_cov"]] = gam_cov$npredpoints_cov
+stan_data[["nknots_cov"]] = gam_cov$nknots_cov
+
+
 
 
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
 
-mod.file = "models/slope_iCAR_route2.stan"
+mod.file = "models/slope_exactCAR_route_covariate.stan"
 
 # parms = c("sdnoise",
 #           "sdobs",
@@ -214,31 +287,34 @@ mod.file = "models/slope_iCAR_route2.stan"
 ## compile model
 slope_model <- cmdstan_model(mod.file)
 
-init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
-                             alpha_raw = rnorm(stan_data$nroutes,0,0.1),
-                             ALPHA = 0,
-                             BETA = 0,
-                             eta = 0,
-                             obs_raw = rnorm(stan_data$nobservers,0,0.1),
-                             sdnoise = 0.2,
-                             sdobs = 0.1,
-                             sdbeta_space = runif(1,0.01,0.1),
-                             sdbeta_rand = runif(1,0.01,0.1),
-                             beta_raw_space = rnorm(stan_data$nroutes,0,0.01),
-                             beta_raw_rand = rnorm(stan_data$nroutes,0,0.01))}
+# init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
+#                              alpha_space = rnorm(stan_data$nroutes,0,0.1),
+#                              #ALPHA = 0,
+#                              BETA = 0,
+#                              eta = 0,
+#                              a_alpha = 1,
+#                              a_beta = 1,
+#                              obs_raw = rnorm(stan_data$nobservers,0,0.1),
+#                              sdnoise = 0.2,
+#                              sdobs = 0.1,
+#                              sdbeta_space = runif(1,0.01,0.1),
+#                              sdbeta_rand = runif(1,0.01,0.1),
+#                              sdalpha_space = runif(1,0.01,0.1),
+#                              beta_space = rnorm(stan_data$nroutes,0,0.01),
+#                              beta_raw_rand = rnorm(stan_data$nroutes,0,0.01))}
 
 
 slope_stanfit <- slope_model$sample(
   data=stan_data,
   refresh=25,
   chains=3, iter_sampling=1000,
-  iter_warmup=1000,
+  iter_warmup=1500,
   parallel_chains = 3,
   #pars = parms,
-  adapt_delta = 0.8,
+  adapt_delta = 0.95,
   max_treedepth = 14,
-  seed = 123,
-  init = init_def)
+  seed = 123)#,
+  #init = init_def)
 
 out_base <- paste0(species_f,"_",scope,"_",firstYear)
 
@@ -256,6 +332,7 @@ csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
 
 shiny_explore <- FALSE
 if(shiny_explore){
+  library(shinystan)
   sl_rstan <- rstan::read_stan_csv(csv_files)
   launch_shinystan(as.shinystan(sl_rstan))
   
