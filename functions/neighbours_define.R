@@ -133,8 +133,9 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
     vintj = st_join(vint,centres,join = st_contains)
     vintj = arrange(vintj,strat_lab)
     
-    nb_db = poly2nb(vintj,row.names = vintj$strat_lab,queen = FALSE)
-    
+    nb_db = spdep::poly2nb(vintj,row.names = vintj$strat_lab,queen = FALSE)#polygon to neighbour definition
+    nb_mat = spdep::nb2mat(nb_db, style = "B",
+                           zero.policy = FALSE) #binary adjacency matrix
     
     # plotting the neighbourhoods to check ------------------------------------
     if(plot_neighbours){
@@ -180,7 +181,8 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
                       "real_strata_map",
                       "vintj",
                       "nb_db",
-                      "cc"),
+                      "cc",
+                      "nb_mat"),
              file = save_file_name)
       }
     }
@@ -201,6 +203,8 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
   ### re-arrange GEOBUGS formated nb_info into appropriate format for Stan model
   car_stan <- mungeCARdata4stan(adjBUGS = nb_info$adj,
                                 numBUGS = nb_info$num)
+  
+  car_stan[["adj_matrix"]] <- matrix(nb_mat)
   
   return(car_stan)
 } ### end of function
