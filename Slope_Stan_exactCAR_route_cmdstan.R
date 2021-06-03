@@ -60,12 +60,14 @@ output_dir <- "G:/BBS_iCAR_route_trends/output"
 #output_dir_simp <- "G:/BBS_iCAR_route_trends/output"
 
 #species = species_list[748]
-
-for(species in rev(allspecies.eng)){
+sp_temp <- c("Song Sparrow",
+             "White-throated Sparrow",
+             "Tree Swallow")
+for(species in rev(sp_temp)){
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
   
-  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
+  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_covariate.RData")
   if(file.exists(sp_file)){next}
     
   #series of if statements that skip analysing hybrids, composite species groups, etc.
@@ -316,7 +318,7 @@ slope_stanfit <- slope_model$sample(
   seed = 123)#,
   #init = init_def)
 
-out_base <- paste0(species_f,"_",scope,"_",firstYear)
+out_base <- paste0(species_f,"_",scope,"_covariate_",firstYear)
 
 # export to csv and read in as rstan --------------------------------------
 slope_stanfit$save_output_files(dir = output_dir,

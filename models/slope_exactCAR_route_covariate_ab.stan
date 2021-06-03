@@ -237,8 +237,9 @@ model {
 
 // intercepts and slopes
 
-   beta = beta_space;
-    alpha = alpha_space;// + ALPHA;
+   beta = beta_space + cov_smooth_b + BETA;
+   alpha = alpha_space + cov_smooth_a + ALPHA;
+ 
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
 
