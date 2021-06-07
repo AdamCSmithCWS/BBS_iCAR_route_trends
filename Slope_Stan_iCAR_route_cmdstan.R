@@ -429,6 +429,15 @@ for(species in allspecies.eng){
   if(file.exists(sp_file)){
 
     load(sp_file)
+    if(species == "Northern Cardinal"){next
+      
+    #csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
+    }
+    if(length(csv_files) == 0){
+      csv_files = paste0("G:/BBS_iCAR_route_trends/output/",
+                         species_f,"_",scope,"_",firstYear,
+                         "-",1:3,".csv")
+    }
     ### may be removed after re-running     launch_shinystan(slope_stanfit)
     sl_rstan <- rstan::read_stan_csv(csv_files)
     #launch_shinystan(as.shinystan(sl_rstan))
@@ -469,6 +478,9 @@ slopes = beta_samples %>% group_by(s) %>%
             uci = quantile(.value,UC),
             sd = sd(.value),
             prec = 1/var(.value),
+            trend = mean((exp(.value)-1)*100),
+            lci_trend = quantile((exp(.value)-1)*100,LC),
+            uci_trend = quantile((exp(.value)-1)*100,UC),
             .groups = "keep")
 
 alpha_samples = posterior_samples(sl_rstan,"alpha",
@@ -523,6 +535,9 @@ slopes_rand = beta_rand_samples %>% group_by(s) %>%
             uci = quantile(.value,UC),
             sd = sd(.value),
             prec = 1/var(.value),
+            trend = mean((exp(.value)-1)*100),
+            lci_trend = quantile((exp(.value)-1)*100,LC),
+            uci_trend = quantile((exp(.value)-1)*100,UC),
             .groups = "keep")
 
 slops_rand_int = inner_join(slopes_rand,interc,by = "s")
@@ -541,6 +556,9 @@ slopes_space = beta_space_samples %>% group_by(s) %>%
             uci = quantile(.value,UC),
             sd = sd(.value),
             prec = 1/var(.value),
+            trend = mean((exp(.value)-1)*100),
+            lci_trend = quantile((exp(.value)-1)*100,LC),
+            uci_trend = quantile((exp(.value)-1)*100,UC),
             .groups = "keep")
 
 slops_space_int = inner_join(slopes_space,interc,by = "s")
@@ -726,62 +744,96 @@ trends_out_space <- bind_rows(trends_out_space,route_map_out_space)
 
 # add mapping of trends ---------------------------------------------------
 
-
-breaks <- c(-0.07, -0.04, -0.02, -0.01, -0.005, 0.005, 0.01, 0.02, 0.04, 0.07)
-labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
-labls = paste0(labls, " slope")
+plot_trend <- TRUE #set to false to plot the slopes
+if(plot_trend){
+  breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
+  lgnd_head <- "Trend\n"
+  trend_title <- "trends"
+  labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+  labls = paste0(labls, " %/year")
+  route_map_out$Tplot <- cut(route_map_out$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+  route_map_out <- route_map_out %>% 
+    mutate(h_ci = (uci_trend-lci_trend)/2)
+  
+  route_map_out_space$Tplot <- cut(route_map_out_space$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+  route_map_out_rand$Tplot <- cut(route_map_out_rand$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+  
+  
+}else{
+  breaks <- c(-0.07, -0.04, -0.02, -0.01, -0.005, 0.005, 0.01, 0.02, 0.04, 0.07)
+  lgnd_head <- "slope\n"
+  trend_title <- "trend-slopes"
+  labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+  labls = paste0(labls, " slope")
+  route_map_out$Tplot <- cut(route_map_out$b,breaks = c(-Inf, breaks, Inf),labels = labls)
+  route_map_out <- route_map_out %>% 
+    mutate(h_ci = (uci-lci)/2)
+  
+  route_map_out_space$Tplot <- cut(route_map_out_space$b,breaks = c(-Inf, breaks, Inf),labels = labls)
+  route_map_out_rand$Tplot <- cut(route_map_out_rand$b,breaks = c(-Inf, breaks, Inf),labels = labls)
+  
+}
 map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
                  "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
 names(map_palette) <- labls
 
-route_map_out$Tplot <- cut(route_map_out$b,breaks = c(-Inf, breaks, Inf),labels = labls)
 
 tmap = ggplot(route_map_out)+
   geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
-  scale_size_continuous(range = c(0.5,3))+
+  scale_size_continuous(range = c(0.5,3),
+                        name = "Mean abundance")+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
-                      name = paste0("slope\n",firstYear,"-",lastYear))+
-  labs(title = paste(species,"trend-slopes by route (size = mean abundance)"))
+                      name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  labs(title = paste("DRAFT ",species,trend_title,"by BBS route"),
+       subtitle = "Route-level trends from a spatial iCAR model, using Stan")
 
 maps[[jj]] <- tmap
+
+
+png(filename = paste0("Figures/images/",species_f,"_Trends_",firstYear,".png"),
+        res = 600,
+    width = 20,
+    height = 15,
+    units = "cm")
+print(tmap)
+dev.off()
+
 
 tmap2 = ggplot(route_map_out)+
   geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
-                      name = paste0("slope\n",firstYear,"-",lastYear))+
+                      name = paste0(lgnd_head,firstYear,"-",lastYear))+
   theme(legend.position = "none")+
   labs(title = paste(species))
 
 maps2[[jj]] <- tmap2
 
 
-route_map_out <- route_map_out %>% 
-  mutate(h_ci = (uci-lci)/2)
+
 tmap3 = ggplot(route_map_out)+
   geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = 1/h_ci))+
   scale_size_continuous(range = c(0.5,3))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
-                      name = paste0("slope\n",firstYear,"-",lastYear))+
+                      name = paste0(lgnd_head,firstYear,"-",lastYear))+
   labs(title = paste(species))
 
 maps3[[jj]] <- tmap3
 
 
 
-route_map_out_space$Tplot <- cut(route_map_out_space$b,breaks = c(-Inf, breaks, Inf),labels = labls)
 
 tmap_space = ggplot(route_map_out_space)+
   geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
-                      name = paste0("slope\n",firstYear,"-",lastYear))+
+                      name = paste0(lgnd_head,firstYear,"-",lastYear))+
   theme(legend.position = "none")+
   labs(title = paste("spatial component"))
 maps_space[[jj]] <- tmap_space
@@ -789,14 +841,13 @@ maps_space[[jj]] <- tmap_space
 
 
 
-route_map_out_rand$Tplot <- cut(route_map_out_rand$b,breaks = c(-Inf, breaks, Inf),labels = labls)
 
 tmap_rand = ggplot(route_map_out_rand)+
   geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
-                      name = paste0("slope\n",firstYear,"-",lastYear))+
+                      name = paste0(lgnd_head,firstYear,"-",lastYear))+
   theme(legend.position = "none")+
   labs(title = paste("random component"))
 
