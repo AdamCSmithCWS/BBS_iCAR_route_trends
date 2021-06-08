@@ -1,8 +1,22 @@
 # BBS_iCAR_route_trends
 
-A spatial iCAR model to estimate route-level trends from BBS data.
+NOTE: This is very much a work in progress. It often changes daily. I am happy to hear suggestions and questions.
 
-The model is written in Stan. It is based on the [bbsBayes](https://github.com/BrandonEdwards/bbsBayes), slope model (e.g., [Sauer and Link 2011](https://doi.org/10.1525/auk.2010.09220)), but without the random year-effects, and with no particular stratification. It's effectively an over-dispersed Poisson regression model with random slopes representing the trends at each route, random intercepts representing the mean abundance (mean count) on each route, as well as the among and within observers effects (true observers, see below)
+# The Goal(s)
+
+A spatial iCAR model to estimate route-level trends from BBS data. One goal is to generate route-level trend estimates that could be used as data in a subsequent exploration of possible covariates of trends and abundances. Another goal is to integrate some covariates into the model directly.
+
+The model is written in Stan. It is based on the [bbsBayes](https://github.com/BrandonEdwards/bbsBayes), slope model (e.g., [Sauer and Link 2011](https://doi.org/10.1525/auk.2010.09220)), but without the random year-effects, and with no particular stratification.
+
+## Acknowledgments and sources
+
+I've relied strongly on elements from these two excellent case studies in Stan:
+
+-   This [intrinsic CAR model structure for the BYM](https://mc-stan.org/users/documentation/case-studies/icar_stan.html) model from Mitzi Morris and co-authors.
+
+-   I'm working at some elaborations of the model that would incorporate a route-level covariate based on this [exact sparse CAR model](https://mc-stan.org/users/documentation/case-studies/mbjoseph-CARStan.html) from Maxwell Joseph.
+
+It's effectively an over-dispersed Poisson regression model with random slopes representing the trends at each route, random intercepts representing the mean abundance (mean count) on each route, as well as the among and within observers effects (true observers, see below)
 
 ## Observer effects
 
