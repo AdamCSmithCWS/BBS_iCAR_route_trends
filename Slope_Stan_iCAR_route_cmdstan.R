@@ -429,11 +429,11 @@ for(species in allspecies.eng){
   if(file.exists(sp_file)){
 
     load(sp_file)
-    if(species == "Northern Cardinal"){next
-      
-    #csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
-    }
-    if(length(csv_files) == 0){
+    # if(species == "Northern Cardinal"){next
+    #   
+    # #csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
+    # }
+    if(length(csv_files) == 0 | length(csv_files == 4)){
       csv_files = paste0("G:/BBS_iCAR_route_trends/output/",
                          species_f,"_",scope,"_",firstYear,
                          "-",1:3,".csv")
@@ -875,9 +875,6 @@ for(j in 1:length(maps)){
 }
 dev.off()
 
-write.csv(trends_out,
-          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_trends_and_intercepts2.csv"))
-
 
 
 # comparison trend maps and trends -------------------------------------------
@@ -908,9 +905,76 @@ dev.off()
 
 
 
-write.csv(trends_out_space,
+
+
+# rename the trend output columns -----------------------------------------
+
+trends_out2 = trends_out %>% 
+  mutate(h_ci = (uci_trend-lci_trend)/2) %>% 
+  select(.,
+         species,route,strat,
+         trend,lci_trend,uci_trend,h_ci,
+         abund,lci_i,uci_i,
+         b,lci,uci,sd) %>% 
+  relocate(.,
+           species,route,strat,
+           trend,lci_trend,uci_trend,h_ci,
+           abund,lci_i,uci_i,
+           b,lci,uci,sd) %>% 
+  rename(.,
+         english_name = species,BBS_route = route, BBS_stratum = strat,
+         Trend = trend,lci95_Trend = lci_trend,uci95_Trend = uci_trend,half_CI_width = h_ci,
+         Mean_abundance = abund,lci95_Mean_abundance = lci_i,uci95_Mean_abundance = uci_i,
+         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd)
+
+
+trends_out_space2 = trends_out_space %>% 
+  mutate(h_ci = (uci_trend-lci_trend)/2) %>% 
+  select(.,
+         species,route,strat,
+         trend,lci_trend,uci_trend,h_ci,
+         abund,lci_i,uci_i,
+         b,lci,uci,sd) %>% 
+  relocate(.,
+           species,route,strat,
+           trend,lci_trend,uci_trend,h_ci,
+           abund,lci_i,uci_i,
+           b,lci,uci,sd) %>% 
+  rename(.,
+         english_name = species,BBS_route = route, BBS_stratum = strat,
+         Trend = trend,lci95_Trend = lci_trend,uci95_Trend = uci_trend,half_CI_width = h_ci,
+         Mean_abundance = abund,lci95_Mean_abundance = lci_i,uci95_Mean_abundance = uci_i,
+         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd)
+
+trends_out_rand2 = trends_out_rand %>% 
+  mutate(h_ci = (uci_trend-lci_trend)/2) %>% 
+  select(.,
+         species,route,strat,
+         trend,lci_trend,uci_trend,h_ci,
+         abund,lci_i,uci_i,
+         b,lci,uci,sd) %>% 
+  relocate(.,
+           species,route,strat,
+           trend,lci_trend,uci_trend,h_ci,
+           abund,lci_i,uci_i,
+           b,lci,uci,sd) %>% 
+  rename(.,
+         english_name = species,BBS_route = route, BBS_stratum = strat,
+         Trend = trend,lci95_Trend = lci_trend,uci95_Trend = uci_trend,half_CI_width = h_ci,
+         Mean_abundance = abund,lci95_Mean_abundance = lci_i,uci95_Mean_abundance = uci_i,
+         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd)
+
+
+# Export the trend estimates ----------------------------------------------
+
+
+write.csv(trends_out2,
+          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_trends_and_intercepts2.csv"))
+
+
+write.csv(trends_out_space2,
           file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_spatial_trends_and_intercepts2.csv"))
-write.csv(trends_out_rand,
+write.csv(trends_out_rand2,
           file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_random_trends_and_intercepts2.csv"))
 
 
