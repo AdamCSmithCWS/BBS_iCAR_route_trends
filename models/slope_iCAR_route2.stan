@@ -8,7 +8,7 @@
 functions {
   real icar_normal_lpdf(vector bb, int nroutes, int[] node1, int[] node2) {
     return -0.5 * dot_self(bb[node1] - bb[node2])
-      + normal_lpdf(sum(bb) | 0, 0.001 * nroutes); //soft sum to zero constraint on phi
+      + normal_lpdf(sum(bb) | 0, 0.001 * nroutes); //soft sum to zero constraint on bb
  }
 }
 
@@ -38,7 +38,8 @@ data {
 parameters {
   vector[ncounts] noise_raw;             // over-dispersion
 
-  vector[nroutes] beta_raw;
+  vector[nroutes] beta_raw_space;
+  vector[nroutes] beta_raw_rand;
   real BETA; 
 
   vector[nroutes] alpha_raw;
@@ -51,7 +52,8 @@ parameters {
   real<lower=0> sdnoise;    // sd of over-dispersion
  //real<lower=1> nu;  //optional heavy-tail df for t-distribution
   real<lower=0> sdobs;    // sd of observer effects
-  real<lower=0> sdbeta;    // sd of slopes 
+  real<lower=0> sdbeta_space;    // sd of slopes 
+ real<lower=0> sdbeta_rand;    // sd of slopes 
   real<lower=0> sdalpha;    // sd of intercepts
 
   
@@ -62,13 +64,18 @@ model {
 
 
   vector[ncounts] E;           // log_scale additive likelihood
-  vector[nroutes] beta;
+   vector[nroutes] beta_rand;
+  vector[nroutes] beta_space;
+ vector[nroutes] beta;
   vector[nroutes] alpha;
   vector[nobservers] obs;
   vector[ncounts] noise;
 
 // covariate effect on intercepts and slopes
-   beta = (sdbeta*beta_raw) + BETA;
+   beta_space = (sdbeta_space*beta_raw_space);
+   beta_rand = (sdbeta_rand*beta_raw_rand);
+   
+   beta = beta_space + beta_rand + BETA;
    alpha = (sdalpha*alpha_raw) + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
@@ -78,10 +85,12 @@ model {
   }
   
   
-  
+  beta_raw_rand ~ normal(0,1);//observer effects
+  sum(beta_raw_rand) ~ normal(0,0.001*nroutes);
+
   
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
-  noise_raw ~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
+  noise_raw ~ normal(0,1); //~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
   
   sdobs ~ std_normal(); //prior on sd of gam hyperparameters
  
@@ -97,10 +106,11 @@ model {
   
   //spatial iCAR intercepts and slopes by strata
   sdalpha ~ normal(0,1); //prior on sd of intercept variation
-  sdbeta ~ normal(0,0.1); //prior on sd of slope variation
+  sdbeta_space ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.1 and 99% < 0.33
+  sdbeta_rand  ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope random variation
 
-  beta_raw ~ icar_normal_lpdf(nroutes, node1, node2);
-  alpha_raw ~ icar_normal_lpdf(nroutes, node1, node2);
+  beta_raw_space ~ icar_normal(nroutes, node1, node2);
+  alpha_raw ~ icar_normal(nroutes, node1, node2);
 
 
 }
@@ -110,18 +120,19 @@ model {
      vector[ncounts] log_lik;
      
        vector[ncounts] E;           // log_scale additive likelihood
+   vector[nroutes] beta_rand;
+  vector[nroutes] beta_space;
   vector[nroutes] beta;
   vector[nroutes] alpha;
   vector[nobservers] obs;
   vector[ncounts] noise;
 
-  real n_r[nroutes,nyears]; // array of route level annual indices
-  
-  real n[nyears]; // matrix of annual indices by species
- 
-// covariate effect on intercepts and slopes
-   beta = (sdbeta*beta_raw) + BETA;
-   alpha = (sdalpha*alpha_raw) + ALPHA;
+// intercepts and slopes
+   beta_space = (sdbeta_space*beta_raw_space);
+   beta_rand = (sdbeta_rand*beta_raw_rand);
+   
+   beta = beta_space + beta_rand + BETA;
+    alpha = (sdalpha*alpha_raw) + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
 
@@ -130,19 +141,6 @@ model {
   }
   
   
-  
-  // tracking the annual indices of abundance with and without simulated aging of observers
-   for(y in 1:nyears){
-     for(j in 1:nroutes){
- 
-        n_r[j,y] = exp(beta[j] * (y-fixedyear) + alpha[j] + 0.5*sdobs^2 + 0.5*sdnoise^2);
-    }
-      n[y] = mean(n_r[,y]); //mean count on routes where species is included
-   }
-
-
-
-
   
   for(i in 1:ncounts){
   log_lik[i] = poisson_log_lpmf(count[i] | E[i]);
