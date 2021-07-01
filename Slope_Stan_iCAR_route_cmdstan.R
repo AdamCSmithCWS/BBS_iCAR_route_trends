@@ -1,4 +1,4 @@
-## building a Stan version of the bbsBayes models
+## building a BYM route-level trend model for the BBS
 
 library(bbsBayes)
 library(tidyverse)
@@ -415,9 +415,14 @@ UC = 0.95
 
 output_dir <- "G:/BBS_iCAR_route_trends/output"
 
+strata_map  <- get_basemap(strata_type = strat,
+                           transform_laea = TRUE,
+                           append_area_weights = FALSE)
 
 
-for(species in allspecies.eng){
+
+
+for(species in rev(allspecies.eng)){
   
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
@@ -433,8 +438,8 @@ for(species in allspecies.eng){
     #   
     # #csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
     # }
-    if(length(csv_files) == 0 | length(csv_files == 4)){
-      csv_files = paste0("G:/BBS_iCAR_route_trends/output/",
+    if(length(csv_files) == 0 | length(csv_files > 3)){
+      csv_files = paste0(output_dir,"/",
                          species_f,"_",scope,"_",firstYear,
                          "-",1:3,".csv")
     }
@@ -623,6 +628,10 @@ sdnoise_samples = posterior_samples(sl_rstan,"sdnoise")%>%
   select(.draw,.value) %>% 
   rename(sdnoise = .value)
 
+sdobs_samples = posterior_samples(sl_rstan,"sdobs")%>% 
+  ungroup() %>% 
+  select(.draw,.value) %>% 
+  rename(sdobs = .value)
 
 
 beta_samples <- beta_samples %>% 
@@ -635,9 +644,12 @@ alpha_samples <- alpha_samples %>%
   select(s,.draw,.value) %>% 
   rename(alpha = .value)
 
-ab_samples = inner_join(beta_samples,alpha_samples)
+ab_samples <- inner_join(beta_samples,alpha_samples)
 
-ab_samples = left_join(ab_samples,sdnoise_samples,by = ".draw")
+ab_samples <- ab_samples %>% 
+  left_join(.,sdnoise_samples,by = ".draw") %>% 
+  left_join(.,sdobs_samples,by = ".draw")
+  
 
 nyears = stan_data$nyears
 fixedyear = stan_data$fixedyear
@@ -645,20 +657,26 @@ YEARS = c(min(jags_data$r_year):max(jags_data$r_year))
 
 if(length(YEARS) != nyears){stop("years don't match YEARS =",length(YEARS),"nyears =",nyears)}
 
-ind_fxn = function(a,b,sdn,y,fy){
-  i = exp(a + b*(y-fy) + (0.5*(sdn^2)))
+ind_fxn = function(a,b,sdn,sdob,y,fy){
+  i = exp(a + b*(y-fy) + (0.5*(sdn^2))+ (0.5*(sdob^2)))
   return(i)
 }
 
+### this could be simplified to just estimate the start and end-years
 i_samples = NULL
 for(yr in 1:nyears){
   i_t = ab_samples %>% 
-    mutate(i = ind_fxn(alpha,beta,sdnoise,yr,fixedyear),
+    mutate(i = ind_fxn(alpha,beta,sdnoise,sdobs,yr,fixedyear),
            y = yr,
            year = YEARS[yr])
   i_samples <- bind_rows(i_samples,i_t)
 }
 
+### this could be tweaked to sum across all routes in the original strata
+### just join to the strata-route dataframe - route_map
+### then add the non-zero-weights for the strata
+### then add the area-weights for the strata
+### and change the group-by value
 indices = i_samples %>% group_by(s,y,year) %>% 
   summarise(index = mean(i),
             lci_i = quantile(i,LC),
@@ -742,6 +760,17 @@ trends_out_space <- bind_rows(trends_out_space,route_map_out_space)
 
 
 
+### setting up boundaries for plots
+# load(paste0("route_maps/",species_f,"_route_data.RData"))
+
+strata_bounds <- st_union(realized_strata_map) #union to provide a simple border of the realised strata
+bb = st_bbox(strata_bounds)
+xlms = as.numeric(c(bb$xmin,bb$xmax))
+ylms = as.numeric(c(bb$ymin,bb$ymax))
+
+
+
+
 # add mapping of trends ---------------------------------------------------
 
 plot_trend <- TRUE #set to false to plot the slopes
@@ -779,13 +808,15 @@ names(map_palette) <- labls
 
 
 tmap = ggplot(route_map_out)+
-  geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  #geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_size_continuous(range = c(0.5,3),
                         name = "Mean abundance")+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  coord_sf(xlim = xlms,ylim = ylms)+
   labs(title = paste("DRAFT ",species,trend_title,"by BBS route"),
        subtitle = "Route-level trends from a spatial iCAR model, using Stan")
 
@@ -802,11 +833,12 @@ dev.off()
 
 
 tmap2 = ggplot(route_map_out)+
-  geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  coord_sf(xlim = xlms,ylim = ylms)+
   theme(legend.position = "none")+
   labs(title = paste(species))
 
@@ -815,12 +847,13 @@ maps2[[jj]] <- tmap2
 
 
 tmap3 = ggplot(route_map_out)+
-  geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = 1/h_ci))+
   scale_size_continuous(range = c(0.5,3))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  coord_sf(xlim = xlms,ylim = ylms)+
   labs(title = paste(species))
 
 maps3[[jj]] <- tmap3
@@ -829,11 +862,12 @@ maps3[[jj]] <- tmap3
 
 
 tmap_space = ggplot(route_map_out_space)+
-  geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  coord_sf(xlim = xlms,ylim = ylms)+
   theme(legend.position = "none")+
   labs(title = paste("spatial component"))
 maps_space[[jj]] <- tmap_space
@@ -843,11 +877,12 @@ maps_space[[jj]] <- tmap_space
 
 
 tmap_rand = ggplot(route_map_out_rand)+
-  geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(aes(colour = Tplot,size = abund))+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  coord_sf(xlim = xlms,ylim = ylms)+
   theme(legend.position = "none")+
   labs(title = paste("random component"))
 
