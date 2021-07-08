@@ -63,6 +63,14 @@ output_dir <- "G:/BBS_iCAR_route_trends/output"
 sp_temp <- c("Song Sparrow",
              "White-throated Sparrow",
              "Tree Swallow")
+
+sp_temp <- c("American Robin",
+             "Hermit Thrush",
+             "Ovenbird",
+             "Barn Swallow",
+             "Chipping Sparrow")
+
+
 for(species in rev(sp_temp)){
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
@@ -133,7 +141,7 @@ for(species in rev(sp_temp)){
  
  
  if(any(is.na(fp_can_sel[,cls_sel]))){
-   print(paste(length(which(is.na(fp_can_sel[,cls_sel])))),"routes are missing covariate data for",species)
+   print(paste(length(which(is.na(fp_can_sel[,cls_sel]))),"routes are missing covariate data for",species))
    fp_can_sel[which(is.na(fp_can_sel[,cls_sel])),cls_sel] <- mean(fp_can_sel[,cls_sel],na.rm = TRUE)
  }
 

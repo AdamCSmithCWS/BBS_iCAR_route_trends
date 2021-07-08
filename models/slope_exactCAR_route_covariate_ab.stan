@@ -232,6 +232,8 @@ model {
        vector[ncounts] E;           // log_scale additive likelihood
   vector[nroutes] beta;
   vector[nroutes] alpha;
+  vector[nroutes] beta_nocov;
+  vector[nroutes] alpha_nocov;
   vector[nobservers] obs;
   vector[ncounts] noise;
 
@@ -239,6 +241,9 @@ model {
 
    beta = beta_space + cov_smooth_b + BETA;
    alpha = alpha_space + cov_smooth_a + ALPHA;
+
+   beta_nocov = beta_space + BETA;
+   alpha_nocov = alpha_space + ALPHA;
  
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;

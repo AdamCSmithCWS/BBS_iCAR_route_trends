@@ -6,7 +6,7 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
                               plot_neighbours = TRUE,
                               species = "",
                               plot_dir = "route_maps/",
-                              plot_file = "_route_maps.pdf",
+                              plot_file = "_route_maps",
                               save_plot_data = TRUE,
                               voronoi = FALSE,
                               add_map = NULL,
@@ -64,7 +64,7 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
                                 x = species)
         
         
-        plot_file_name = paste0(plot_dir,species_dirname,plot_file)
+        plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
         
         cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
         
@@ -92,8 +92,8 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
         dev.off()
         
         if(save_plot_data){
-          save_file_name = paste0(plot_dir,species_dirname,"_route_data.RData")
-          
+          save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
+
           save(list = c("centres",
                         "real_strata_map",
                         "vintj",
@@ -148,7 +148,7 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
                               x = species)
       
       
-      plot_file_name = paste0(plot_dir,species_dirname,plot_file)
+      plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
       
       cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
       
@@ -178,7 +178,7 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
       dev.off()
       
       if(save_plot_data){
-        save_file_name = paste0(plot_dir,species_dirname,"_route_data.RData")
+        save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
         
         save(list = c("centres",
                       "real_strata_map",
