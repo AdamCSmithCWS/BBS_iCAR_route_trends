@@ -67,10 +67,21 @@ output_dir <- "G:/BBS_iCAR_route_trends/output"
 # for(species in rev(allspecies.eng)){
 #   
 
+selSpecies = c("Boat-tailed Grackle","Ring-billed Gull","Dusky Flycatcher",
+               "Broad-winged Hawk","Brown Creeper",
+               "Tennessee Warbler","Cape May Warbler","Northern Bobwhite")
 
-species <- "Tennessee Warbler"
+sp_type = data.frame(species = selSpecies,
+                     spatial_pattern = c("weak","weak","weak",
+                                         "moderate","moderate",
+                                         "strong","strong","strong"))
 
 
+pred_save_allsp <- NULL
+
+
+
+for(species in selSpecies){
 
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
@@ -352,6 +363,7 @@ for(ynext in (minimumYear+1):lastYear){
   
   obs_df_predict_out <- bind_cols(obs_df_predict,log_lik_samples)
   obs_df_predict_out <- bind_cols(obs_df_predict_out,E_pred_samples)
+  obs_df_predict_out$species <- species
   
   predictions_save_CAR <- bind_rows(predictions_save_CAR,obs_df_predict_out)
   
@@ -362,6 +374,12 @@ for(ynext in (minimumYear+1):lastYear){
   # nonSpatial model fit ----------------------------------------------------
   
   mod.file.non = "models/slope_noniCAR_route2_LFO_CV.stan"
+  
+  ## removing the spatial input data
+  stan_data_non <- stan_data
+  stan_data_non[["N_edges"]] = NULL
+  stan_data_non[["node1"]] = NULL
+  stan_data_non[["node2"]] = NULL
   
   ## compile model
   slope_model_non <- cmdstan_model(mod.file.non)
@@ -381,7 +399,7 @@ for(ynext in (minimumYear+1):lastYear){
   
   
   slope_stanfit_non <- slope_model_non$sample(
-    data=stan_data,
+    data=stan_data_non,
     refresh=100,
     chains=3, iter_sampling=1000,
     iter_warmup=1000,
@@ -426,6 +444,7 @@ for(ynext in (minimumYear+1):lastYear){
   
   obs_df_predict_out <- bind_cols(obs_df_predict,log_lik_samples)
   obs_df_predict_out <- bind_cols(obs_df_predict_out,E_pred_samples)
+  obs_df_predict_out$species <- species
   
   predictions_save_NonCAR <- bind_rows(predictions_save_NonCAR,obs_df_predict_out)
   
@@ -439,6 +458,7 @@ for(ynext in (minimumYear+1):lastYear){
                 "E_pred_samples_full_non",
                 "slope_stanfit_non",
                 "stan_data",
+                "stan_data_non",
                 "obs_df_predict",
                 "predictions_save_NonCAR",
                 "predictions_save_CAR",
@@ -454,7 +474,16 @@ for(ynext in (minimumYear+1):lastYear){
 }
 
 
+predictions_save_NonCAR$model <- "NonSpatial"
+predictions_save_CAR$model <- "Spatial"
 
+pred_save = bind_rows(predictions_save_CAR,predictions_save_NonCAR)
+
+pred_save_allsp <- bind_rows(pred_save_allsp,pred_save)
+
+save(list = "pred_save",file = "temp_pred_save.RData")
+
+}# end species loop
 
 
 #stopCluster(cl = cluster)
@@ -462,9 +491,45 @@ for(ynext in (minimumYear+1):lastYear){
 
 
 
+pred_save$yearF <- factor(paste(pred_save$year,pred_save$model))
+
+point_comp = ggplot(data = pred_save,aes(y = log_lik_mean,group = yearF, colour = model))+
+  geom_boxplot(position = position_dodge())
+print(point_comp)
 
 
 
+log_lik_comp <- pred_save %>% 
+  select(r_year,year,route,log_lik_mean,model,count) %>% 
+  pivot_wider(values_from = log_lik_mean,
+               names_from = model) %>% 
+  mutate(log_lik_dif = Spatial - NonSpatial)
+
+log_lik_sum_point <- log_lik_comp %>% 
+  group_by(r_year) %>% 
+  summarise(mean = mean(log_lik_dif),
+            median = median(log_lik_dif),
+            sd = sd(log_lik_dif),
+            SE = sd(log_lik_dif)/sqrt(n()),
+            sum = sum(log_lik_dif))
+log_lik_sum_point
+
+
+
+log_lik_sum_over <- log_lik_comp %>% 
+  summarise(mean = mean(log_lik_dif),
+            median = median(log_lik_dif),
+            sd = sd(log_lik_dif),
+            SE = sd(log_lik_dif)/sqrt(n()),
+            sum = sum(log_lik_dif))
+log_lik_sum_over
+
+
+dif_comp = ggplot(data = log_lik_comp,aes(x = r_year,y = log_lik_dif))+
+  #geom_point(position = position_jitter(width = 0.4)) + 
+  geom_boxplot(aes(y = log_lik_dif,group = r_year))
+
+print(dif_comp)
 
 # post loop analysis ------------------------------------------------------
 

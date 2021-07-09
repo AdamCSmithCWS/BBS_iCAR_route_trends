@@ -4,14 +4,6 @@
 // and no random year-effects - slope only
 
 
-//iCAR function
-functions {
-  real icar_normal_lpdf(vector bb, int nroutes, int[] node1, int[] node2) {
-    return -0.5 * dot_self(bb[node1] - bb[node2])
-    + normal_lpdf(sum(bb) | 0, 0.001 * nroutes); //soft sum to zero constraint on bb
-  }
-}
-
 
 data {
   int<lower=1> nroutes;
@@ -27,11 +19,7 @@ data {
   
   int<lower=1> fixedyear; // centering value for years
   
-  // spatial neighbourhood information
-  int<lower=1> N_edges;
-  int<lower=1, upper=nroutes> node1[N_edges];  // node1[i] adjacent to node2[i]
-  int<lower=1, upper=nroutes> node2[N_edges];  // and node1[i] < node2[i]
-  
+
   
   // values for predicting next years data
   int<lower=1> ncounts_pred;
@@ -111,7 +99,8 @@ model {
   sdalpha ~ normal(0,1); //prior on sd of intercept variation
   sdbeta_rand  ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope random variation
   
-  alpha_raw ~ icar_normal(nroutes, node1, node2);
+  alpha_raw ~ normal(0,1);//icar_normal(nroutes, node1, node2);
+  sum(alpha_raw) ~ normal(0,0.001*nroutes);
   
   
 }

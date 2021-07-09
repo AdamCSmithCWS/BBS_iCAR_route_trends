@@ -62,9 +62,8 @@ output_dir <- "G:/BBS_iCAR_route_trends/output"
 #species = species_list[748]
 sp_temp <- c("Song Sparrow",
              "White-throated Sparrow",
-             "Tree Swallow")
-
-sp_temp <- c("American Robin",
+             "Tree Swallow",
+             "American Robin",
              "Hermit Thrush",
              "Ovenbird",
              "Barn Swallow",
@@ -76,7 +75,7 @@ for(species in rev(sp_temp)){
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
   
   sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_covariate.RData")
-  if(file.exists(sp_file)){next}
+  #if(file.exists(sp_file)){next}
     
   #series of if statements that skip analysing hybrids, composite species groups, etc.
   if(grepl(pattern = "hybrid",x = species)){next}
@@ -112,7 +111,7 @@ for(species in rev(sp_temp)){
  load("data/compiled_footprint_data.RData")
  
  
- buf_sel = buffer_sizes[3] #selecting the 4 km buffer
+ buf_sel = buffer_sizes[2] #selecting the 4 km buffer
  
  # fp_components
  # [1] "cumulative"                   "built"                       
@@ -123,7 +122,7 @@ for(species in rev(sp_temp)){
  # [11] "population_density"           "rail"                        
  # [13] "roads" 
  
- preds <- fp_components[c(1)]
+ preds <- fp_components[c(8)]
  
  cls_sel <- paste(preds,buf_sel,"mean",sep = "_")
  cls_sel_i <- c("rt.uni",cls_sel)
@@ -378,7 +377,8 @@ save(list = c("slope_stanfit",
               "sp_file",
               "species_f",
               "csv_files",
-              "output_dir"),
+              "output_dir",
+              "gam_cov"),
      file = sp_file)
 
 }
@@ -396,87 +396,24 @@ save(list = c("slope_stanfit",
 
 
 
-# post loop analysis ------------------------------------------------------
-
-
-# 
-# launch_shinystan(slope_stanfit) 
-# 
-# 
-# library(loo)
-# library(tidyverse)
-# 
-# log_lik_1 <- extract_log_lik(slope_stanfit, merge_chains = FALSE)
-# r_eff <- relative_eff(exp(log_lik_1), cores = 10)
-# loo_1 <- loo(log_lik_1, r_eff = r_eff, cores = 10)
-# print(loo_1)
-# 
-# doy = ((jags_data$month-4)*30+jags_data$day)
-# plot(loo_1$pointwise[,"influence_pareto_k"],log(stan_data$count+1))
-# plot(loo_1$pointwise[,"influence_pareto_k"],doy)
-# plot(doy,log(stan_data$count+1))
-# 
-# 
-# 
-# loo2 = data.frame(loo_1$pointwise)
-# 
-# loo2$flag = cut(loo2$influence_pareto_k,breaks = c(0,0.5,0.7,1,Inf))
-# dts = data.frame(count = stan_data$count,
-#                  obser = stan_data$obser,
-#                  route = stan_data$route,
-#                  year = stan_data$year)
-# loo2 = cbind(loo2,dts)
-# 
-# plot(log(loo2$count+1),loo2$influence_pareto_k)
-# 
-# obserk = loo2 %>% group_by(obser) %>% 
-#   summarise(n = log(n()),
-#             mean_k = mean(influence_pareto_k),
-#             max_k = max(influence_pareto_k),
-#             sd_k = sd(influence_pareto_k),
-#             mean_looic = mean(looic),
-#             mean_ploo = mean(p_loo))
-# plot(obserk$n,obserk$max_k)
-# plot(obserk$n,obserk$mean_k)
-# plot(obserk$n,obserk$sd_k)
-# plot(obserk$n,obserk$mean_looic)
-# plot(obserk$n,obserk$mean_ploo)
-# 
-# 
-# yeark = loo2 %>% group_by(year) %>% 
-#   summarise(n = n(),
-#             mean_k = mean(influence_pareto_k),
-#             q90 = quantile(influence_pareto_k,0.9),
-#             max_k = max(influence_pareto_k),
-#             sd_k = sd(influence_pareto_k),
-#             route = mean(route),
-#             sd = sd(route))
-# plot(yeark$year,yeark$max_k)
-# plot(yeark$year,yeark$mean_k)
-# plot(yeark$year,yeark$sd_k)
-# plot(yeark$year,yeark$q90)
-# 
-# routek = loo2 %>% group_by(route) %>% 
-#   summarise(n = n(),
-#             mean_k = mean(influence_pareto_k),
-#             q90_k = quantile(influence_pareto_k,0.9),
-#             max_k = max(influence_pareto_k),
-#             sd_k = sd(influence_pareto_k),
-#             route = mean(route),
-#             sd = sd(route))
-# plot(routek$route,routek$max_k)
-# plot(routek$n,routek$mean_k)
-# 
-# plot(routek$route,routek$mean_k)
-# plot(routek$route,routek$sd_k)
-# plot(routek$route,routek$q90_k)
-# 
-# 
-
 
 # PLOTTING and trend output -----------------------------------------------
 
-# library(tidybayes)
+sp_temp <- c("Song Sparrow",
+             "White-throated Sparrow",
+             "Tree Swallow",
+             "American Robin",
+             "Hermit Thrush",
+             "Ovenbird",
+             "Barn Swallow",
+             "Chipping Sparrow")
+
+
+
+
+
+
+
 
 
 route_trajectories <- FALSE #set to FALSE to speed up mapping
@@ -502,20 +439,28 @@ UC = 0.95
 
 output_dir <- "G:/BBS_iCAR_route_trends/output"
 
+effect_plots <- vector(mode = "list",length = length(sp_temp))
 
-
-for(species in allspecies.eng){
+for(species in sp_temp[5:8]){
   
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
   
-  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
-  
-  
+  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_covariate.RData")
+
   #sp_file <- paste0("output/",species,"Canadian_",firstYear,"_",lastYear,"_slope_route_iCAR2.RData")
   if(file.exists(sp_file)){
 
     load(sp_file)
+    route_map_df = data.frame(route_map)
+    cls_sel <- names(route_map_df)[4]
+    gam_cov = gam_basis(as.numeric(route_map_df[,cls_sel]),
+                        nknots = 10,
+                        npredpoints = 50,
+                        sm_name = "cov")
+    pred_df <- data.frame(cov = gam_cov$cov_visualized_predictor_values,
+                          cc = 1:gam_cov$npredpoints_cov)
+    
     ### may be removed after re-running     launch_shinystan(slope_stanfit)
     sl_rstan <- rstan::read_stan_csv(csv_files)
     #launch_shinystan(as.shinystan(sl_rstan))
@@ -543,7 +488,73 @@ for(species in allspecies.eng){
     # 
     
     ####
-# add trend and abundance ----------------------------------------
+    
+    
+
+# Explore shape of covariate effects --------------------------------------
+
+
+    cov_smooth_b_vis <- posterior_samples(sl_rstan,"cov_smooth_b_vis",
+                                       dims = "cc") %>% 
+      posterior_sums(.,quantiles = NULL,dims = "cc") %>% 
+      mutate(effect = "slope")
+    
+    cov_smooth_a_vis <- posterior_samples(sl_rstan,"cov_smooth_a_vis",
+                                          dims = "cc") %>% 
+      posterior_sums(.,quantiles = NULL,dims = "cc") %>% 
+      mutate(effect = "abundance")
+    
+    
+    cov_effs <- bind_rows(cov_smooth_b_vis,
+                          cov_smooth_a_vis) %>% 
+      left_join(.,pred_df,by = "cc")
+    
+    
+    eff_plot <- ggplot(data = cov_effs,aes(x = cov,y = mean))+
+      geom_ribbon(aes(ymin = lci,ymax = uci),alpha = 0.2)+
+      geom_line()+
+      labs(title = paste(species,cls_sel))+
+      facet_wrap(~effect,nrow = 2,scales = "free")
+    
+    effect_plots[[jj]] <- eff_plot
+    
+    #print(eff_plot)
+     
+    
+    
+    
+  }
+}
+    
+    
+ pdf(paste0("Figures/covariate_effects_",cls_sel,".pdf"),
+     width = 8.5,
+     height = 11)
+ for(jj in 1:length(effect_plots)){
+   print(effect_plots[[jj]])
+ }
+    dev.off()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+      
+    
+        
+# compare trends with after removing covariate effect ----------------------------------------
 
 beta_samples = posterior_samples(sl_rstan,"beta",
                                  dims = "s")
