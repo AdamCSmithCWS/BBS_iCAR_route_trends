@@ -70,7 +70,7 @@ sp_temp <- c("Song Sparrow",
              "Chipping Sparrow")
 
 
-for(species in rev(sp_temp)){
+for(species in rev(species_list)){
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
   
@@ -122,7 +122,7 @@ for(species in rev(sp_temp)){
  # [11] "population_density"           "rail"                        
  # [13] "roads" 
  
- preds <- fp_components[c(8)]
+ preds <- fp_components[c(1)]
  
  cls_sel <- paste(preds,buf_sel,"mean",sep = "_")
  cls_sel_i <- c("rt.uni",cls_sel)
@@ -441,7 +441,7 @@ output_dir <- "G:/BBS_iCAR_route_trends/output"
 
 effect_plots <- vector(mode = "list",length = length(sp_temp))
 
-for(species in sp_temp[5:8]){
+for(species in sp_temp){
   
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)

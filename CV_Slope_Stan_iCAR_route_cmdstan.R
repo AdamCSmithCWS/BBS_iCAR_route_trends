@@ -79,9 +79,15 @@ sp_type = data.frame(species = selSpecies,
 
 pred_save_allsp <- NULL
 
+sp_w_trends <- list.files(path = "Figures/images/")
+sp_w_trends <- gsub(gsub(sp_w_trends,pattern = "_Trends_2004.png",replacement = ""),pattern = "_",replacement = " ")
+
+rselsp <- sample(sp_w_trends,50)
+
+selSpecies <- unique(c(selSpecies,rselsp))
 
 
-for(species in selSpecies){
+for(species in selSpecies[8:54]){
 
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
@@ -481,7 +487,7 @@ pred_save = bind_rows(predictions_save_CAR,predictions_save_NonCAR)
 
 pred_save_allsp <- bind_rows(pred_save_allsp,pred_save)
 
-save(list = "pred_save",file = "temp_pred_save.RData")
+save(list = "pred_save_allsp",file = "temp_pred_save.RData")
 
 }# end species loop
 
@@ -489,24 +495,32 @@ save(list = "pred_save",file = "temp_pred_save.RData")
 #stopCluster(cl = cluster)
 
 
+load("temp_pred_save.RData")
 
 
-pred_save$yearF <- factor(paste(pred_save$year,pred_save$model))
+wdrop = which(pred_save_allsp$species == "Broad-winged Hawk" & pred_save_allsp$r_year == 2017 & pred_save_allsp$route == "90-53")
+pred_save_allsp <- pred_save_allsp[-wdrop[c(1,3)],]
 
-point_comp = ggplot(data = pred_save,aes(y = log_lik_mean,group = yearF, colour = model))+
-  geom_boxplot(position = position_dodge())
+save(list = "pred_save_allsp",file = "pred_save_allsp.RData")
+
+pred_save_allsp$yearF <- factor(paste(pred_save_allsp$year,pred_save_allsp$model))
+
+point_comp = ggplot(data = pred_save_allsp,aes(y = log_lik_mean,group = yearF, colour = model))+
+  geom_boxplot(position = position_dodge())+
+  facet_wrap(~species,nrow = 3,ncol = 3)
 print(point_comp)
 
 
 
-log_lik_comp <- pred_save %>% 
-  select(r_year,year,route,log_lik_mean,model,count) %>% 
+log_lik_comp <- pred_save_allsp %>% 
+  select(species,r_year,year,route,log_lik_mean,model,count) %>% 
+  group_by(species,r_year,route) %>% 
   pivot_wider(values_from = log_lik_mean,
-               names_from = model) %>% 
+               names_from = c(model)) %>% 
   mutate(log_lik_dif = Spatial - NonSpatial)
 
 log_lik_sum_point <- log_lik_comp %>% 
-  group_by(r_year) %>% 
+  group_by(species,r_year) %>% 
   summarise(mean = mean(log_lik_dif),
             median = median(log_lik_dif),
             sd = sd(log_lik_dif),
@@ -517,6 +531,7 @@ log_lik_sum_point
 
 
 log_lik_sum_over <- log_lik_comp %>% 
+  group_by(species) %>% 
   summarise(mean = mean(log_lik_dif),
             median = median(log_lik_dif),
             sd = sd(log_lik_dif),
