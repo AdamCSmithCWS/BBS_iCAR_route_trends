@@ -57,53 +57,53 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
                              zero.policy = TRUE) #binary adjacency matrix
       
       # plotting the neighbourhoods to check ------------------------------------
-      if(plot_neighbours){
-        
-        species_dirname <- gsub(pattern = " ",
-                                replacement = "_",
-                                x = species)
-        
-        
-        plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
-        
-        cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
-        
-        ggp = ggplot(data = real_strata_map)+
-          geom_sf(data = vintj,alpha = 0.3,colour = grey(0.8))+ 
-          geom_sf(data = real_strata_map,alpha = 0.1)+ 
-          geom_sf(aes(col = strat_lab))+
-          geom_sf_text(aes(label = strat_lab),size = 5,alpha = 0.8)+
-          labs(title = species)
-        
-        if(!is.null(add_map)){
-          ggp <- ggp +
-            geom_sf(add_map,alpha = 0,colour = grey(0.9))+
-            theme(legend.position = "none")
-        }else{
-          ggp <- ggp +
-            theme(legend.position = "none")
-        }
-        pdf(file = plot_file_name,
-            width = 11,
-            height = 8.5)
-        plot(nb_db,cc,col = "pink")
-        text(labels = rownames(cc),cc ,pos = 2)
-        print(ggp)
-        dev.off()
-        
-        if(save_plot_data){
-          save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
-
-          save(list = c("centres",
-                        "real_strata_map",
-                        "vintj",
-                        "nb_db",
-                        "cc",
-                        "nb_mat"),
-               file = save_file_name)
-        }
-      }
-      
+      # if(plot_neighbours){
+      #   
+      #   species_dirname <- gsub(pattern = " ",
+      #                           replacement = "_",
+      #                           x = species)
+      #   
+      #   
+      #   plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
+      #   
+      #   cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
+      #   
+      #   ggp = ggplot(data = real_strata_map)+
+      #     geom_sf(data = vintj,alpha = 0.3,colour = grey(0.8))+ 
+      #     geom_sf(data = real_strata_map,alpha = 0.1)+ 
+      #     geom_sf(aes(col = strat_lab))+
+      #     geom_sf_text(aes(label = strat_lab),size = 5,alpha = 0.8)+
+      #     labs(title = species)
+      #   
+      #   if(!is.null(add_map)){
+      #     ggp <- ggp +
+      #       geom_sf(add_map,alpha = 0,colour = grey(0.9))+
+      #       theme(legend.position = "none")
+      #   }else{
+      #     ggp <- ggp +
+      #       theme(legend.position = "none")
+      #   }
+      #   pdf(file = plot_file_name,
+      #       width = 11,
+      #       height = 8.5)
+      #   plot(nb_db,cc,col = "pink")
+      #   text(labels = rownames(cc),cc ,pos = 2)
+      #   print(ggp)
+      #   dev.off()
+      #   
+      #   if(save_plot_data){
+      #     save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
+      # 
+      #     save(list = c("centres",
+      #                   "real_strata_map",
+      #                   "vintj",
+      #                   "nb_db",
+      #                   "cc",
+      #                   "nb_mat"),
+      #          file = save_file_name)
+      #   }
+      # }
+      # 
       nb_info = spdep::nb2WB(nb_db)
       
       if(min(nb_info$num) == 0){
@@ -141,55 +141,74 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
                            zero.policy = TRUE) #binary adjacency matrix
     
     # plotting the neighbourhoods to check ------------------------------------
-    if(plot_neighbours){
-      
-      species_dirname <- gsub(pattern = " ",
-                              replacement = "_",
-                              x = species)
-      
-      
-      plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
-      
-      cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
-      
-      ggp = ggplot(data = centres)+
-        geom_sf(data = vintj,alpha = 0,colour = grey(0.95))+ 
-        geom_sf(data = real_strata_map,alpha = 0.1)+ 
-        geom_sf(aes(col = strat_lab))+
-        geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8,colour = grey(0.7))+
-        labs(title = species)
-      
-      if(!is.null(add_map)){
-        ggp <- ggp +
-          geom_sf(data = add_map,alpha = 0,colour = grey(0.85))+
-          theme_minimal()+
-          theme(legend.position = "none")
-      }else{
-        ggp <- ggp+
-          theme_minimal() +
-          theme(legend.position = "none")
-      }
-      pdf(file = plot_file_name,
-          width = 11,
-          height = 8.5)
-      plot(nb_db,cc,col = "pink")
-      text(labels = rownames(cc),cc ,pos = 2)
-      print(ggp)
-      dev.off()
-      
-      if(save_plot_data){
-        save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
-        
-        save(list = c("centres",
-                      "real_strata_map",
-                      "vintj",
-                      "nb_db",
-                      "cc",
-                      "nb_mat"),
-             file = save_file_name)
-      }
-    }
-    ## stop here and look at the maps (2 pages)
+    # if(plot_neighbours){
+    #   
+    #   species_dirname <- gsub(pattern = " ",
+    #                           replacement = "_",
+    #                           x = species)
+    #   
+    #   
+    #   plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
+    #   
+    #   cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
+    #   
+    #   
+    #   nb_l <- nb2listw(nb_db)
+    #   nt = length(attributes(nb_l$neighbours)$region.id)
+    #   DA = data.frame(
+    #     from = rep(1:nt,sapply(nb_l$neighbours,length)),
+    #     to = unlist(nb_l$neighbours)
+    #   )
+    #   DA = cbind(DA,coords[DA$from,c("X","Y")],coords[DA$to,c("X","Y")])
+    #   colnames(DA)[3:6] = c("long","lat","long_to","lat_to")
+    #   
+    #   
+    #   ggp = ggplot(data = centres)+
+    #     geom_sf(data = vintj,alpha = 0,colour = grey(0.95))+ 
+    #     geom_sf(data = real_strata_map,alpha = 0.1)+ 
+    #     geom_sf(aes(col = strat_lab))+
+    #     #geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8,colour = grey(0.7))+
+    #     labs(title = species)
+    #   
+    # 
+    #   #plot it using geom_segment
+    #   ggp <- ggp + geom_segment(data=DA,aes(x = long, y = lat,xend=long_to,yend=lat_to),inherit.aes = FALSE,size=0.3,alpha=0.15)
+    #   
+    #   # tmp = ggplot()+
+    #   #   geom_segment(data=DA,aes(x = long, y = lat,xend=long_to,yend=lat_to),inherit.aes = FALSE,size=0.3,alpha=0.5)
+    #   # 
+    #   if(!is.null(add_map)){
+    #     ggp <- ggp +
+    #       geom_sf(data = add_map,alpha = 0,colour = grey(0.85))+
+    #       theme_minimal()+
+    #       theme(legend.position = "none")
+    #   }else{
+    #     ggp <- ggp+
+    #       theme_minimal() +
+    #       theme(legend.position = "none")
+    #   }
+    #   pdf(file = plot_file_name,
+    #       width = 11,
+    #       height = 8.5)
+    #   plot(nb_db,cc,col = "pink")
+    #   text(labels = rownames(cc),cc ,pos = 2)
+    #   print(ggp)
+    #   dev.off()
+    #   
+    #   if(save_plot_data){
+    #     save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
+    #     
+    #     save(list = c("centres",
+    #                   "real_strata_map",
+    #                   "vintj",
+    #                   "nb_db",
+    #                   "cc",
+    #                   "nb_mat",
+    #                   "DA"),
+    #          file = save_file_name)
+    #   }
+    # }
+    # ## stop here and look at the maps (2 pages)
     ## in the first page each route location is plotted as a point and all neighbours are linked by red lines 
     ## in the second page all of the voronoi polygons with their route numbers are plotted
     ### assuming the above maps look reasonable 
@@ -201,6 +220,105 @@ neighbours_define <- function(real_strata_map = realized_strata_map,
   }#end if voronoi
   
   
+  if(plot_neighbours){
+    
+    species_dirname <- gsub(pattern = " ",
+                            replacement = "_",
+                            x = species)
+    
+    
+    plot_file_name = paste0(plot_dir,species_dirname,plot_file,".pdf")
+    
+    cc = suppressWarnings(st_coordinates(st_centroid(vintj)))
+    
+    
+    nb_l <- nb2listw(nb_db)
+    nt = length(attributes(nb_l$neighbours)$region.id)
+    DA = data.frame(
+      from = rep(1:nt,sapply(nb_l$neighbours,length)),
+      to = unlist(nb_l$neighbours)
+    )
+    DA = cbind(DA,coords[DA$from,c("X","Y")],coords[DA$to,c("X","Y")])
+    colnames(DA)[3:6] = c("long","lat","long_to","lat_to")
+    
+    if(voronoi){
+    ggp <- ggplot(data = centres)
+    }else{
+      ggp <- ggplot(data = real_strata_map) 
+      }
+    
+    # #### temp bits to generate some demo graphs of neighbour definitions
+    # ggp <- ggp + 
+    #   geom_sf(aes(col = strat_lab)) + 
+    #   geom_sf(data = real_strata_map,alpha = 0,colour = grey(0.85))+
+    #   #geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8,colour = grey(0.7))+
+    #   geom_sf(data = add_map,alpha = 0,colour = grey(0.85))+
+    #   labs(title = species) +
+    #   #geom_sf(data = vintj,alpha = 0,colour = grey(0.85))+
+    #   theme_minimal()+
+    #   theme(legend.position = "none")
+    # 
+    # ggp <- ggp + 
+    #   #geom_sf(aes(col = strat_lab)) + 
+    #   #geom_segment(data=DA,aes(x = long, y = lat,xend=long_to,yend=lat_to),inherit.aes = FALSE,size=0.3,alpha=0.1) +
+    #   geom_sf(data = vintj,alpha = 0,colour = grey(0.85))
+    #   
+    # ggp <- ggplot(data = centres)
+    # 
+    # ggp <- ggp + 
+    #   geom_sf(aes(col = strat_lab)) + 
+    #   geom_segment(data=DA,aes(x = long, y = lat,xend=long_to,yend=lat_to),inherit.aes = FALSE,size=0.3,alpha=0.1) +
+    #   geom_sf(data = real_strata_map,alpha = 0,colour = grey(0.85))+
+    #   #geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8,colour = grey(0.7))+
+    #   geom_sf(data = add_map,alpha = 0,colour = grey(0.85))+
+    #   labs(title = species) +
+    #   #geom_sf(data = vintj,alpha = 0,colour = grey(0.85))+
+    #   theme_minimal()+
+    #   theme(legend.position = "none")
+    # 
+    # 
+    # ### temp
+    
+    ggp <- ggp + 
+      geom_sf(aes(col = strat_lab)) + 
+      geom_segment(data=DA,aes(x = long, y = lat,xend=long_to,yend=lat_to),inherit.aes = FALSE,size=0.3,alpha=0.1) +
+      geom_sf(data = vintj,alpha = 0,colour = grey(0.95))+ 
+      geom_sf(data = real_strata_map,alpha = 0,colour = grey(0.85))+
+      #geom_sf_text(aes(label = strat_lab),size = 3,alpha = 0.8,colour = grey(0.7))+
+      labs(title = species)
+    
+    
+    if(!is.null(add_map)){
+      ggp <- ggp +
+        geom_sf(data = add_map,alpha = 0,colour = grey(0.85))+
+        theme_minimal()+
+        theme(legend.position = "none")
+    }else{
+      ggp <- ggp+
+        theme_minimal() +
+        theme(legend.position = "none")
+    }
+    pdf(file = plot_file_name,
+        width = 11,
+        height = 8.5)
+    plot(nb_db,cc,col = "pink")
+    text(labels = rownames(cc),cc ,pos = 2)
+    print(ggp)
+    dev.off()
+    
+    if(save_plot_data){
+      save_file_name = paste0(plot_dir,species_dirname,plot_file,"_data.RData")
+      
+      save(list = c("centres",
+                    "real_strata_map",
+                    "vintj",
+                    "nb_db",
+                    "cc",
+                    "nb_mat",
+                    "DA"),
+           file = save_file_name)
+    }
+  }
   
   
   ### re-arrange GEOBUGS formated nb_info into appropriate format for Stan model
