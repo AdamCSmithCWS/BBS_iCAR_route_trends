@@ -439,9 +439,9 @@ UC = 0.95
 
 output_dir <- "G:/BBS_iCAR_route_trends/output"
 
-effect_plots <- vector(mode = "list",length = length(sp_temp))
+effect_plots <- vector(mode = "list",length = length(species_list))
 
-for(species in sp_temp){
+for(species in species_list[c(337:length(species_list))]){
   
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
@@ -462,6 +462,7 @@ for(species in sp_temp){
                           cc = 1:gam_cov$npredpoints_cov)
     
     ### may be removed after re-running     launch_shinystan(slope_stanfit)
+    if(length(csv_files) != 3){next}
     sl_rstan <- rstan::read_stan_csv(csv_files)
     #launch_shinystan(as.shinystan(sl_rstan))
     
@@ -525,7 +526,8 @@ for(species in sp_temp){
     
   }
 }
-    
+  
+save(list = c("effect_plots"), file = paste0("output/covariate_effects_",cls_sel,".RData"))  
     
  pdf(paste0("Figures/covariate_effects_",cls_sel,".pdf"),
      width = 8.5,

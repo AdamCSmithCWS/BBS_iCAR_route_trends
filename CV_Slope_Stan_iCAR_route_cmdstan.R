@@ -87,14 +87,16 @@ rselsp <- sample(sp_w_trends,50)
 selSpecies <- unique(c(selSpecies,rselsp))
 
 
-for(species in selSpecies[8:54]){
+for(species in selSpecies[c(54:40)]){
 
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
+species_f <- gsub(species_f,pattern = "'",replacement = "",fixed = T)
 
 # if(file.exists(sp_file)){next}
 #   
 #series of if statements that skip analysing hybrids, composite species groups, etc.
 if(grepl(pattern = "hybrid",x = species)){next}
+if(grepl(pattern = "unid.",x = species)){next}
 if(grepl(pattern = " x ",x = species)){next}
 if(grepl(pattern = "/",fixed = TRUE,x = species)){next}
 if(substr(x = species,1,1) == "("){next}
@@ -485,9 +487,12 @@ predictions_save_CAR$model <- "Spatial"
 
 pred_save = bind_rows(predictions_save_CAR,predictions_save_NonCAR)
 
+save(list = "pred_save",file = paste0("output/",species_f,"_pred_save.RData"))
+
+
 pred_save_allsp <- bind_rows(pred_save_allsp,pred_save)
 
-save(list = "pred_save_allsp",file = "temp_pred_save.RData")
+save(list = "pred_save_allsp",file = "temp_pred_save3.RData")
 
 }# end species loop
 
@@ -495,7 +500,7 @@ save(list = "pred_save_allsp",file = "temp_pred_save.RData")
 #stopCluster(cl = cluster)
 
 
-load("temp_pred_save.RData")
+load("pred_save_allsp.RData")
 
 
 wdrop = which(pred_save_allsp$species == "Broad-winged Hawk" & pred_save_allsp$r_year == 2017 & pred_save_allsp$route == "90-53")
@@ -519,15 +524,37 @@ log_lik_comp <- pred_save_allsp %>%
                names_from = c(model)) %>% 
   mutate(log_lik_dif = Spatial - NonSpatial)
 
-log_lik_sum_point <- log_lik_comp %>% 
+dif_comp = ggplot(data = log_lik_comp,aes(x = r_year,y = log_lik_dif))+
+  #geom_point(position = position_jitter(width = 0.4)) + 
+  geom_boxplot(aes(y = log_lik_dif,group = r_year))
+
+print(dif_comp)
+
+
+log_lik_sum_year <- log_lik_comp %>% 
   group_by(species,r_year) %>% 
   summarise(mean = mean(log_lik_dif),
             median = median(log_lik_dif),
             sd = sd(log_lik_dif),
             SE = sd(log_lik_dif)/sqrt(n()),
-            sum = sum(log_lik_dif))
-log_lik_sum_point
+            lci = mean-(1.96*SE),
+            uci = mean+(1.96*SE),
+            sum = sum(log_lik_dif))%>% 
+  mutate(favoured_model = ifelse(mean > 0,"Spatial","Non-Spatial"),
+         year = r_year)
+log_lik_sum_year
 
+yearly_plot <- ggplot(data = log_lik_sum_year,aes(x = year,y = mean,colour = favoured_model))+
+  geom_pointrange(aes(ymin = lci,ymax = uci))+
+  geom_abline(slope = 0,intercept = 0)+
+  ylab("Mean point-level difference in log(probability)")+
+  theme_classic()+
+  facet_wrap(~species,scales = "free")
+pdf(file = paste0("Figures/Annual_difference_predictive_accuracy.pdf"),
+    width = 8.5,
+    height = 11)
+print(yearly_plot)
+dev.off()
 
 
 log_lik_sum_over <- log_lik_comp %>% 
@@ -536,15 +563,28 @@ log_lik_sum_over <- log_lik_comp %>%
             median = median(log_lik_dif),
             sd = sd(log_lik_dif),
             SE = sd(log_lik_dif)/sqrt(n()),
-            sum = sum(log_lik_dif))
+            lci = mean-(1.96*SE),
+            uci = mean+(1.96*SE),
+            sum = sum(log_lik_dif)) %>% 
+  arrange(mean) %>% 
+  mutate(species = factor(species,ordered = TRUE,levels = species),
+         favoured_model = ifelse(mean > 0,"Spatial","Non-Spatial"))
 log_lik_sum_over
 
+overall_plot <- ggplot(data = log_lik_sum_over,aes(x = species,y = mean,colour = favoured_model))+
+  geom_pointrange(aes(ymin = lci,ymax = uci))+
+  geom_abline(slope = 0,intercept = 0)+
+  ylab("Mean point-level difference in log(probability)")+
+  theme_classic()+
+  coord_flip()
 
-dif_comp = ggplot(data = log_lik_comp,aes(x = r_year,y = log_lik_dif))+
-  #geom_point(position = position_jitter(width = 0.4)) + 
-  geom_boxplot(aes(y = log_lik_dif,group = r_year))
 
-print(dif_comp)
+pdf(file = paste0("Figures/Overall_difference_predictive_accuracy.pdf"),
+    width = 8.5,
+    height = 11)
+print(overall_plot)
+dev.off()
+
 
 # post loop analysis ------------------------------------------------------
 
@@ -663,6 +703,7 @@ for(species in rev(allspecies.eng)){
   
   
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
+  species_f <- gsub(species_f,pattern = "'",replacement = "_",fixed = T)
   
   sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
   
