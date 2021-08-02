@@ -66,5 +66,46 @@ trends_out_space2 <- read.csv(file = paste0("output/combined_",firstYear,"_",las
 
 
 
+groups = c("Grassland.birds",
+           "Forest.birds",
+           "Other.birds",
+           "Aerial.insectivores",
+           "suburban",
+           "other.wetland.birds")
+
+
+
+# group loop --------------------------------------------------------------
+
+g_sel = groups[1]
+
+
+# species selection of trend data -----------------------------------------
+
+
+socb_c = which(grepl(names(socb),pattern = g_sel))
+
+sp_sel1 = socb[which(socb[,socb_c] == "Included in group"),"species"]
+
+sp_sel2 = sp_sel1[which(sp_sel1 %in% sps_all)]
+
+
+# covariate data ----------------------------------------------------------
+
+load("data/fp_change.RData")
+
+# non-breeding range change in footprint by species
+sp_w_fp_ch_dat <- fp_ch_non_breeding$english
+#some species don't have range data on footprint
+sp_sel = sp_sel2[which(sp_sel2 %in% sp_w_fp_ch_dat)]
+
+
+dat = all %>% filter(species %in% sp_sel)
+
+
+
+
+
+
 
 
