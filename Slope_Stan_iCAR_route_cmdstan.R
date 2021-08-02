@@ -1009,6 +1009,9 @@ write.csv(trends_out2,
 
 write.csv(trends_out_space2,
           file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_spatial_trends_and_intercepts2.csv"))
+
+
+
 write.csv(trends_out_rand2,
           file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_random_trends_and_intercepts2.csv"))
 
@@ -1037,3 +1040,6 @@ width = 8.5,
 height = 17)
 print(var_dif_plot)
 dev.off()
+
+
+
