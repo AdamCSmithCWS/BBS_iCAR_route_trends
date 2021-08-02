@@ -353,6 +353,8 @@ save(list = c("loo_stan_NONspatial","loo_stan_spatial",
   
 
 
+load("output/loo_prediction_comparison_spatial_NON.RData")
+
 # full loo ----------------------------------------------------------------
 loo_full <- NULL
 
@@ -502,9 +504,10 @@ dif_plot_mean_count <- ggplot(data = route_n,aes(y = mean_dif_elpd,x = mean_coun
 
 print(dif_plot_mean_count)
 
+# compare trend predictions -----------------------------------------
 
 
-#### compare trend predictions
+#### 
 
 trends_comp <- left_join(trends_out,sp_type,by = "species") %>% 
   arrange(.,spatial_pattern,species,routeF) %>% 
@@ -525,10 +528,14 @@ bi_plot_trends <- ggplot(data = trends_comp,aes(x = trend_spat,y = trend_NONspat
                          guide = guide_legend(title = "relative SD of trend",
                                               reverse = TRUE))+
   theme_minimal()+
+  theme(legend.position = "none")+
   facet_wrap(~species,nrow = 2,ncol = 2,scales = "free")
 
+pdf(file = paste0("Figures/bi_plot_trends_spatial_non_by_pred.pdf"),
+    width = 8,
+    height = 8)
 print(bi_plot_trends)
-
+dev.off()
 
 
 bi_plot_prec <- ggplot(data = trends_comp,aes(x = prec_spat,y = prec_NONspat))+

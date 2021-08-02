@@ -11,7 +11,6 @@ route_maps/
 tmp_route_data/
 trajectories/
 *.exe
-data/
 temp.stan
 
 
