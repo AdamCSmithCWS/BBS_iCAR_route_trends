@@ -192,5 +192,47 @@ dev.off()
 
 
 
+# just a standard route-map -----------------------------------------------
+strata_map  <- bbsBayes::load_map(stratify_by = strat)
+
+
+route_map <- unique(strat_data$route_strat[,c("rt.uni","Latitude","Longitude","strat_name")])
+
+route_map = st_as_sf(route_map,coords = c("Longitude","Latitude"))
+st_crs(route_map) <- 4269 #NAD83 commonly used by US federal agencies
+#load strata map
+
+route_map = st_transform(route_map,crs = st_crs(strata_map))
+
+strata_bounds <- st_union(route_map) #union to provide a simple border of the realised strata
+bb = st_bbox(strata_bounds)
+xlms = as.numeric(c(bb$xmin,bb$xmax))
+ylms = as.numeric(c(bb$ymin,bb$ymax))
+
+
+# MAPPING -----------------------------------------------------------------
+
+
+
+tmap = ggplot(route_map)+
+  #geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(size = 0.1)+
+  coord_sf(xlim = xlms,ylim = ylms)
+
+
+
+png(filename = "all_bbs_routes.png",
+    res = 600,
+    width = 20,
+    height = 15,
+    units = "cm")
+print(tmap)
+dev.off()
+
+
+
+
+
 
 
