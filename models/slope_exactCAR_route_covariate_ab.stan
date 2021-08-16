@@ -12,7 +12,7 @@ functions {
  // }
  // 
  
- /**
+ /** function thanks to https://mc-stan.org/users/documentation/case-studies/mbjoseph-CARStan.html
   * Return the log probability of a proper conditional autoregressive (CAR) prior 
   * with a sparse representation for the adjacency matrix
   *
@@ -209,7 +209,7 @@ model {
   count ~ poisson_log(E); //vectorized count likelihood with log-transformation
   
   eta ~ normal(0,1);// prior on first-year observer effect
-  a_beta ~ beta(2,5);//
+  a_beta ~ beta(2,5);// more informative than a_alpha, helps allocate some of the spatial pattern to the covariate
   a_alpha ~ uniform(0,1);//
 
   //spatial CAR intercepts and slopes by strata
