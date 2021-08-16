@@ -500,35 +500,61 @@ save(list = "pred_save_allsp",file = "temp_pred_save3.RData")
 #stopCluster(cl = cluster)
 
 
+
+
+
+
+# Temporary and ugly combining of saved results ---------------------------
+
+
 load("pred_save_allsp.RData")
 
+pred_save_allsp1 <- pred_save_allsp
 
-wdrop = which(pred_save_allsp$species == "Broad-winged Hawk" & pred_save_allsp$r_year == 2017 & pred_save_allsp$route == "90-53")
-pred_save_allsp <- pred_save_allsp[-wdrop[c(1,3)],]
+load("temp_pred_save.RData")
 
-save(list = "pred_save_allsp",file = "pred_save_allsp.RData")
+pred_save_allsp2 <- pred_save_allsp
+
+load("temp_pred_save3.RData")
+
+pred_save_allsp3 <- pred_save_allsp
+
+pred_save_allsp <- bind_rows(pred_save_allsp1,pred_save_allsp2,pred_save_allsp3)
+
+#### end ugly
+
+
+#save(list = "pred_save_allsp",file = "pred_save_allsp.RData")
+
+#save(list = "pred_save_allsp",file = "pred_save_allsp_combined.RData")
+load("pred_save_allsp_combined.RData")
+
+# wdrop = which(pred_save_allsp$species == "American Bittern" & pred_save_allsp$r_year == 2012 & pred_save_allsp$route == "14-159")
+# pred_save_allsp <- pred_save_allsp[-wdrop,]
+
 
 pred_save_allsp$yearF <- factor(paste(pred_save_allsp$year,pred_save_allsp$model))
 
-point_comp = ggplot(data = pred_save_allsp,aes(y = log_lik_mean,group = yearF, colour = model))+
-  geom_boxplot(position = position_dodge())+
-  facet_wrap(~species,nrow = 3,ncol = 3)
-print(point_comp)
-
-
-
-log_lik_comp <- pred_save_allsp %>% 
-  select(species,r_year,year,route,log_lik_mean,model,count) %>% 
-  group_by(species,r_year,route) %>% 
+# point_comp = ggplot(data = pred_save_allsp,aes(y = log_lik_mean,group = yearF, colour = model))+
+#   geom_boxplot(position = position_dodge())+
+#   facet_wrap(~species,nrow = 6,ncol = 4)
+# print(point_comp)
+# 
+# 
+# 
+log_lik_comp <- pred_save_allsp %>%
+  select(species,r_year,year,route,log_lik_mean,model,count) %>%
+  distinct(.,species,r_year,route,model,.keep_all = TRUE)%>% 
+  group_by(species,r_year,route) %>%
   pivot_wider(values_from = log_lik_mean,
-               names_from = c(model)) %>% 
+               names_from = c(model))%>%
   mutate(log_lik_dif = Spatial - NonSpatial)
 
-dif_comp = ggplot(data = log_lik_comp,aes(x = r_year,y = log_lik_dif))+
-  #geom_point(position = position_jitter(width = 0.4)) + 
-  geom_boxplot(aes(y = log_lik_dif,group = r_year))
-
-print(dif_comp)
+# dif_comp = ggplot(data = log_lik_comp,aes(x = r_year,y = log_lik_dif))+
+#   #geom_point(position = position_jitter(width = 0.4)) + 
+#   geom_boxplot(aes(y = log_lik_dif,group = r_year))
+# 
+# print(dif_comp)
 
 
 log_lik_sum_year <- log_lik_comp %>% 
@@ -576,14 +602,37 @@ overall_plot <- ggplot(data = log_lik_sum_over,aes(x = species,y = mean,colour =
   geom_abline(slope = 0,intercept = 0)+
   ylab("Mean point-level difference in log(probability)")+
   theme_classic()+
-  coord_flip()
+  xlab("")+
+  theme(legend.position = "none")+
+  coord_flip(ylim = c(-1,1))
+  
 
 
 pdf(file = paste0("Figures/Overall_difference_predictive_accuracy.pdf"),
-    width = 8.5,
-    height = 11)
+    width = 10,
+    height = 7)
 print(overall_plot)
 dev.off()
+
+
+
+overall_plot2 <- ggplot(data = log_lik_sum_over,aes(x = species,y = mean,colour = favoured_model))+
+  geom_pointrange(aes(ymin = lci,ymax = uci))+
+  geom_abline(slope = 0,intercept = 0)+
+  ylab("Mean point-level difference in log(probability)")+
+  theme_classic()+
+  xlab("")+
+  theme(legend.position = "none")+
+  coord_flip(ylim = c(-30,30))
+
+
+
+pdf(file = paste0("Figures/Overall_difference_predictive_accuracy_zoom_out.pdf"),
+    width = 10,
+    height = 7)
+print(overall_plot2)
+dev.off()
+
 
 
 # post loop analysis ------------------------------------------------------

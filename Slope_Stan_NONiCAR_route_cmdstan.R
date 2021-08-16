@@ -511,8 +511,8 @@ print(dif_plot_mean_count)
 
 trends_comp <- left_join(trends_out,sp_type,by = "species") %>% 
   arrange(.,spatial_pattern,species,routeF) %>% 
-  filter(species %in% c("Dusky Flycatcher","Ring-billed Gull",
-                        "Northern Bobwhite","Tennessee Warbler")) %>% 
+  filter(species %in% c("Ring-billed Gull",
+                        "Northern Bobwhite")) %>% 
   mutate(cv_abund_spat = sd_spat/abund_spat,
          cv_abund_NONspat = sd_NONspat/abund_NONspat) %>% 
   group_by(species) %>% 
@@ -528,12 +528,12 @@ bi_plot_trends <- ggplot(data = trends_comp,aes(x = trend_spat,y = trend_NONspat
                          guide = guide_legend(title = "relative SD of trend",
                                               reverse = TRUE))+
   theme_minimal()+
-  theme(legend.position = "none")+
+  #theme(legend.position = "none")+
   facet_wrap(~species,nrow = 2,ncol = 2,scales = "free")
 
 pdf(file = paste0("Figures/bi_plot_trends_spatial_non_by_pred.pdf"),
     width = 8,
-    height = 8)
+    height = 4)
 print(bi_plot_trends)
 dev.off()
 
@@ -548,6 +548,7 @@ bi_plot_prec <- ggplot(data = trends_comp,aes(x = prec_spat,y = prec_NONspat))+
   #                        guide = guide_legend(title = "relative SD of trend",
   #                                             reverse = TRUE))+
   theme_minimal()+
+  theme(legend.position = "none")+
   facet_wrap(~species,nrow = 2,ncol = 2,scales = "free")
 
 print(bi_plot_prec)

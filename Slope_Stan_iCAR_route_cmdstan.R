@@ -29,7 +29,7 @@ model = "slope"
 strat_data = stratify(by = strat)
 
 firstYear = 2004
-lastYear = 2019
+lastYear = 2017
 
 
 
@@ -942,9 +942,15 @@ dev.off()
 
 
 
+
+# add in the original BBS route database start coordinates
+
+starts = unique(strat_data$route_strat[,c("rt.uni","Latitude","Longitude")])
+
 # rename the trend output columns -----------------------------------------
 
 trends_out2 = trends_out %>% 
+  data.frame() %>% 
   mutate(h_ci = (uci_trend-lci_trend)/2) %>% 
   select(.,
          species,route,strat,
@@ -960,10 +966,12 @@ trends_out2 = trends_out %>%
          english_name = species,BBS_route = route, BBS_stratum = strat,
          Trend = trend,lci95_Trend = lci_trend,uci95_Trend = uci_trend,half_CI_width = h_ci,
          Mean_abundance = abund,lci95_Mean_abundance = lci_i,uci95_Mean_abundance = uci_i,
-         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd)
+         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd) %>% 
+  left_join(starts,by = c("BBS_route" = "rt.uni"))
 
 
 trends_out_space2 = trends_out_space %>% 
+  data.frame() %>% 
   mutate(h_ci = (uci_trend-lci_trend)/2) %>% 
   select(.,
          species,route,strat,
@@ -979,9 +987,11 @@ trends_out_space2 = trends_out_space %>%
          english_name = species,BBS_route = route, BBS_stratum = strat,
          Trend = trend,lci95_Trend = lci_trend,uci95_Trend = uci_trend,half_CI_width = h_ci,
          Mean_abundance = abund,lci95_Mean_abundance = lci_i,uci95_Mean_abundance = uci_i,
-         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd)
+         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd) %>% 
+  left_join(starts,by = c("BBS_route" = "rt.uni"))
 
 trends_out_rand2 = trends_out_rand %>% 
+  data.frame() %>% 
   mutate(h_ci = (uci_trend-lci_trend)/2) %>% 
   select(.,
          species,route,strat,
@@ -997,14 +1007,15 @@ trends_out_rand2 = trends_out_rand %>%
          english_name = species,BBS_route = route, BBS_stratum = strat,
          Trend = trend,lci95_Trend = lci_trend,uci95_Trend = uci_trend,half_CI_width = h_ci,
          Mean_abundance = abund,lci95_Mean_abundance = lci_i,uci95_Mean_abundance = uci_i,
-         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd)
+         slope = b,lci95_slope = lci,uci95_slope = uci,sd_slope = sd) %>% 
+  left_join(starts,by = c("BBS_route" = "rt.uni"))
 
 
 # Export the trend estimates ----------------------------------------------
 
 
 write.csv(trends_out2,
-          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_trends_and_intercepts2.csv"))
+          file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_trends_and_intercepts.csv"))
 
 
 write.csv(trends_out_space2,
