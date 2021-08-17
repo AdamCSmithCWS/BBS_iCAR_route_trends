@@ -29,7 +29,7 @@ model = "slope"
 strat_data = stratify(by = strat)
 
 firstYear = 2004
-lastYear = 2017
+lastYear = 2019
 
 
 
