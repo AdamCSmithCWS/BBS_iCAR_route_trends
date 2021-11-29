@@ -1,0 +1,26 @@
+---
+title: "Paper notes"
+author: "Adam"
+date: "11/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Key Messages
+
+1.  Route trends are useful for covariates and for exploring spatial patterns in population change
+
+2.  For short periods of time, a log-linear slope is a reasonable estimate of the long-term trend
+
+3.  spatial hierarchical slopes and intercepts provide a reasonable way to explore the spatial-temporal patterns of variation in population size. Assumption that abundance and trend are spatially dependent is extremely reasonable.
+
+4.  leave future out, cross validation of the spatial vs non-spatial version. Consider also a comparison of the simple spatial version without the added random trend component.
+
+5.  covariates on the slopes and intercepts can be easily added
+
+6.  metric of the fit of a linear change - autocorrelation of the errors
+
+7.  archived estimates of 15-year trends, and code to generate estimates for any other time-period
