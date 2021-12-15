@@ -85,7 +85,7 @@ model {
   }
   
   
-  beta_raw_rand ~ normal(0,1);//observer effects
+  beta_raw_rand ~ normal(0,1);//random slope effects
   sum(beta_raw_rand) ~ normal(0,0.001*nroutes);
 
   

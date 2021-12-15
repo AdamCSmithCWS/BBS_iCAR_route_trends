@@ -1,5 +1,37 @@
 ## 1-step ahead, cross-validation of a BYM route-level trend model for the BBS
-## example using two species. 
+## example using a selection of species.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### to do: expand this to include a simpler iCAR model without the added random 
+####        trend component - non BYM iCAR model.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 library(bbsBayes)
 library(tidyverse)
