@@ -5,13 +5,9 @@
 library(bbsBayes)
 library(tidyverse)
 library(cmdstanr)
-# library(rstan)
-# rstan_options(auto_write = TRUE, javascript = FALSE)
-# library(shinystan)
+library(patchwork)
 library(sf)
 library(spdep)
-# library(doParallel)
-# library(foreach)
 library(ggforce)
 #library(tidybayes)
 #source("functions/mungeCARdata4stan.R")
@@ -22,179 +18,208 @@ source("functions/posterior_summary_functions.R") ## functions similar to tidyba
 ## changes captured in a commit on Nov 20, 2020
 
 
-# load and stratify CASW data ---------------------------------------------
-#species = "Pacific Wren"
-#species = "Barred Owl"
 strat = "bbs_usgs"
 model = "slope"
 
-strat_data = stratify(by = strat)
 
 firstYear = 2004
 lastYear = 2019
 
+scope = "RangeWide"
+
+
 species = "Blue-headed Vireo"
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
+
+
+
+# SPECIES LOOP ------------------------------------------------------------
+
+output_dir <- "output"
 sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
 
+load(sp_file) 
 
-#if(file.exists(sp_file)){
+output_dir <- "output"
 
-sp_file_non <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_NONiCAR.RData")
+out_base_ns <- paste0(species_f,"_Non_spatial_",firstYear,"_",lastYear)
 
+csv_files_ns <- paste0(output_dir,"/",out_base_ns,"-",1:3,".csv")
 
+stanfit_ns <- as_cmdstan_fit(files = csv_files_ns)
 
+out_base <- paste0(species_f,"_RangeWide_",firstYear,"_",lastYear)
 
+csv_files <- paste0(output_dir,"/",out_base,"-",1:3,".csv")
 
-
-  scope = "RangeWide"
-  us_strata_remove <- NULL
-
-  
-  out_base <- paste0(species_f,"_Non_spatial_",scope,"_",firstYear)
-  
-  # export to csv and read in as rstan --------------------------------------
-  slope_stanfit$save_output_files(dir = output_dir,
-                                  basename = out_base,
-                                  random = FALSE,
-                                  timestamp = FALSE)
-  
-  csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
-  
+stanfit <- as_cmdstan_fit(files = csv_files)
 
 
+# extract trends and abundances -------------------------------------------
 
-trends_out2 <- read.csv(file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_trends_and_intercepts2.csv"))
+routes_df <- data.frame(routeF = jags_data$routeF,
+                      route = jags_data$route) %>% 
+  distinct()
 
+tr_f <- function(x){
+  t <- (exp(x)-1)*100
+}
 
-trends_out_space2 <- read.csv(file = paste0("output/combined_",firstYear,"_",lastYear,"_",scope,"_spatial_trends_and_intercepts2.csv"))
-names(trends_out2) <- c(names(trends_out2)[-1],"geometry2")
-names(trends_out_space2) <- c(names(trends_out_space2)[-1],"geometry2")
-
-
-
-sps_all <- unique(trends_out_space2$english_name)
-
-socb <- read.csv("data/SOCB data supplement.csv")
-
-groups = c("Grassland.birds",
-           "Forest.birds",
-           "Other.birds",
-           "Aerial.insectivores",
-           "suburban",
-           "other.wetland.birds")
-
-
-
-# group loop --------------------------------------------------------------
-
-g_sel = groups[1]
-
-for(g_sel in groups){
-
-# species selection of trend data -----------------------------------------
+trends <- posterior_samples(fit = stanfit,
+                              parm = "beta",
+                              dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(trend = tr_f(mean),
+         trend_lci = tr_f(lci),
+         trend_uci = tr_f(uci),
+         trend_se = tr_f(sd))
 
 
-socb_c = which(grepl(names(socb),pattern = g_sel))
+trends_ns <- posterior_samples(fit = stanfit_ns,
+                            parm = "beta",
+                            dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(trend = tr_f(mean),
+         trend_lci = tr_f(lci),
+         trend_uci = tr_f(uci),
+         trend_se = tr_f(sd))
 
-sp_sel1 = socb[which(socb[,socb_c] == "Included in group"),"species"]
-sp_sel1[which(sp_sel1 == "Le Conte's Sparrow")] <- "LeConte's Sparrow"
-sp_sel2 = sp_sel1[which(sp_sel1 %in% sps_all)]
+# abundances --------------------------------------------------------------
 
 
+abund <- posterior_samples(fit = stanfit,
+                            parm = "alpha",
+                            dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(abund = exp(mean),
+         abund_lci = exp(lci),
+         abund_uci = exp(uci),
+         abund_se = exp(sd)) %>% 
+  select(route,abund,abund_lci,abund_uci,abund_se)
 
-dat = trends_out_space2 %>% filter(english_name %in% sp_sel2)
 
-#Trend = as.numeric(scale(Trend,scale = FALSE)),  
-
-
-dat_plot <- dat %>% group_by(english_name) %>% 
-  mutate(Abund = as.numeric(scale(Mean_abundance,scale = TRUE))) %>% 
-  group_by(BBS_route,BBS_stratum) %>% 
-  summarise(mean_Trend = mean(Trend),
-            mean_Abund = mean(Abund),
-            n_species = n())
-
+abund_ns <- posterior_samples(fit = stanfit_ns,
+                              parm = "alpha",
+                              dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(abund = exp(mean),
+         abund_lci = exp(lci),
+         abund_uci = exp(uci),
+         abund_se = exp(sd)) %>% 
+  select(route,abund,abund_lci,abund_uci,abund_se)
 
 
 # generate route map ------------------------------------------------------
 strata_map  <- bbsBayes::load_map(stratify_by = strat)
+# 
+# 
+# route_map <- unique(strat_data$route_strat[,c("rt.uni","Latitude","Longitude","strat_name")])
+# 
+# route_map = st_as_sf(route_map,coords = c("Longitude","Latitude"))
+# st_crs(route_map) <- 4269 #NAD83 commonly used by US federal agencies
+# #load strata map
+# 
+# route_map = st_transform(route_map,crs = st_crs(strata_map))
+# 
+# 
+# route_map_out = inner_join(route_map,dat_plot,by = c("rt.uni" = "BBS_route",
+#                                             "strat_name" = "BBS_stratum"))
+# 
+# 
 
-
-route_map <- unique(strat_data$route_strat[,c("rt.uni","Latitude","Longitude","strat_name")])
-
-route_map = st_as_sf(route_map,coords = c("Longitude","Latitude"))
-st_crs(route_map) <- 4269 #NAD83 commonly used by US federal agencies
-#load strata map
-
-route_map = st_transform(route_map,crs = st_crs(strata_map))
-
-
-route_map_out = inner_join(route_map,dat_plot,by = c("rt.uni" = "BBS_route",
-                                            "strat_name" = "BBS_stratum"))
-
-
-
-strata_bounds <- st_union(route_map_out) #union to provide a simple border of the realised strata
+strata_bounds <- st_union(route_map) #union to provide a simple border of the realised strata
 bb = st_bbox(strata_bounds)
 xlms = as.numeric(c(bb$xmin,bb$xmax))
 ylms = as.numeric(c(bb$ymin,bb$ymax))
 
 
+trend_plot_map <- route_map %>% 
+  left_join(.,trends,by = "route") %>% 
+  left_join(.,abund,by = "route")
+
+trend_plot_map_ns <- route_map %>% 
+  left_join(.,trends_ns,by = "route") %>% 
+  left_join(.,abund,by = "route")
+
 # MAPPING -----------------------------------------------------------------
 
-plot_trend <- TRUE #set to false to plot the abundance
-if(plot_trend){
+# plot_trend <- TRUE #set to false to plot the abundance
+# if(plot_trend){
   breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
   lgnd_head <- "Mean Trend\n"
   trend_title <- "Mean Trend"
   labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
   labls = paste0(labls, " %/year")
-  route_map_out$Tplot <- cut(route_map_out$mean_Trend,breaks = c(-Inf, breaks, Inf),labels = labls)
-
+  trend_plot_map$Tplot <- cut(trend_plot_map$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+  trend_plot_map_ns$Tplot <- cut(trend_plot_map_ns$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
   
   
-}else{
-  breaks <- c(-2, -1, -0.5, -0.1, -0.05, 0.05, 0.1, 0.5, 1, 2)
-  lgnd_head <- "Mean Scaled Abundance\n"
-  trend_title <- "Mean Scaled Abundance"
-  labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
-  labls = paste0(labls, " Abund")
-  route_map_out$Tplot <- cut(route_map_out$mean_Abund,breaks = c(-Inf, breaks, Inf),labels = labls)
-
-}
+#   
+# }else{
+#   breaks <- c(-2, -1, -0.5, -0.1, -0.05, 0.05, 0.1, 0.5, 1, 2)
+#   lgnd_head <- "Mean Scaled Abundance\n"
+#   trend_title <- "Mean Scaled Abundance"
+#   labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+#   labls = paste0(labls, " Abund")
+#   route_map_out$Tplot <- cut(route_map_out$mean_Abund,breaks = c(-Inf, breaks, Inf),labels = labls)
+# 
+# }
 map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
                  "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
 names(map_palette) <- labls
 
 
-tmap = ggplot(route_map_out)+
+tmap = ggplot(trend_plot_map)+
   #geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
   geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
-  geom_sf(aes(colour = Tplot,size = n_species))+
+  geom_sf(aes(colour = Tplot,size = abund))+
   scale_size_continuous(range = c(0.1,3),
-                        name = "Number of species")+
+                        name = "Mean Count")+
   scale_colour_manual(values = map_palette, aesthetics = c("colour"),
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,firstYear,"-",lastYear))+
   coord_sf(xlim = xlms,ylim = ylms)+
-  labs(title = paste("DRAFT ",g_sel,trend_title,"by BBS route"),
-       subtitle = "Route-level trends from a spatial iCAR model, using Stan")
+  title("Spatial")
 
+tmap_ns = ggplot(trend_plot_map_ns)+
+  #geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(aes(colour = Tplot,size = abund))+
+  scale_size_continuous(range = c(0.1,3),
+                        name = "Mean Count")+
+  scale_colour_manual(values = map_palette, aesthetics = c("colour"),
+                      guide = guide_legend(reverse=TRUE),
+                      name = paste0(lgnd_head,firstYear,"-",lastYear))+
+  coord_sf(xlim = xlms,ylim = ylms)+
+  title("NonSpatial")
 
+print(tmap + tmap_ns)+
+  plot_layout(guides = "collect")
 
-png(filename = paste0("Figures/images/",g_sel,"_Mean_Trends_",firstYear,".png"),
-    res = 600,
-    width = 20,
-    height = 15,
-    units = "cm")
-print(tmap)
+out = (tmap + tmap_ns)+plot_layout(nrow = 2,guides = "collect")
+
+# png(filename = paste0("Figures/images/",g_sel,"_Mean_Trends_",firstYear,".png"),
+#     res = 600,
+#     width = 20,
+#     height = 15,
+#     units = "cm")
+pdf(file = paste0("Figures/",species_f,out_base,"_vs_nonspatial.pdf"),
+    height = 11,
+    width = 8.5)
+print(out)
 dev.off()
 
 
 
-}
 
 
 

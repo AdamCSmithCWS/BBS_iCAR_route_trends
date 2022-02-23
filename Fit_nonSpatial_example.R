@@ -92,10 +92,32 @@ slope_stanfit <- slope_model$sample(
   output_basename = out_base)
 
 
-# export to csv and read in as rstan --------------------------------------
 
 
+# strat_df <- as.data.frame(realized_strata_map)
 
+
+# convergence summary -----------------------------------------------------
+
+
+stanf_df <- slope_stanfit$draws(format = "df")
+
+#optional removes the count-level parameters
+drws <- stanf_df #%>% 
+#   select(!contains(c("E[","noise_raw"))) 
+
+conv_summ <- summarise_draws(drws) %>% 
+  mutate(species = species,
+         model = out_base)
+
+failed_rhat <- conv_summ %>% 
+  filter(rhat > 1.05)
+
+failed_ess_bulk <- conv_summ %>% 
+  filter(ess_bulk < 100)
+
+
+write.csv(conv_summ,file = paste0("trends_etc/conv_summ_",out_base,".csv"))
 
 
 
