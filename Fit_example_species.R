@@ -34,11 +34,11 @@ scope = "RangeWide"
 
 
 species = "Blue-headed Vireo"
-species = "Dickcissel"
+#species = "Dickcissel"
 
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
-for(spp in c("_","_Non_spatial_")){
+for(spp in c("_","_Non_spatial_","_BYM_")){
 out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
 
 
@@ -77,8 +77,8 @@ init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
                              sdbeta_rand = runif(1,0.01,0.1),
                              beta_raw_rand = rnorm(stan_data$nroutes,0,0.01))}
 }else{
-  mod.file = "models/slope_iCAR_route.stan"
-  slope_model <- cmdstan_model(mod.file)
+  if(spp == "_BYM_"){
+  mod.file = "models/slope_BYM_route.stan"
   
   init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
                                alpha_raw = rnorm(stan_data$nroutes,0,0.1),
@@ -92,8 +92,27 @@ init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
                                beta_raw_rand = rnorm(stan_data$nroutes,0,0.01),
                                sdbeta_space = runif(1,0.01,0.1),
                                beta_raw_space = rnorm(stan_data$nroutes,0,0.01))} 
+
+  }else{
+    mod.file = "models/slope_iCAR_route.stan"
+    
+    init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
+                                 alpha_raw = rnorm(stan_data$nroutes,0,0.1),
+                                 ALPHA = 0,
+                                 BETA = 0,
+                                 eta = 0,
+                                 obs_raw = rnorm(stan_data$nobservers,0,0.1),
+                                 sdnoise = 0.2,
+                                 sdobs = 0.1,
+                                 sdbeta_space = runif(1,0.01,0.1),
+                                 beta_raw_space = rnorm(stan_data$nroutes,0,0.01))} 
+    
+    
+  }
 }
 
+
+slope_model <- cmdstan_model(mod.file)
 
 slope_stanfit <- slope_model$sample(
   data=stan_data,

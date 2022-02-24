@@ -188,7 +188,21 @@ trends_rand <- posterior_samples(fit = stanfit,
          abs_trend = abs(trend))%>% 
   select(route,trend,trend_lci,trend_uci,trend_se,abs_trend) %>% 
   rename_with(.,~paste0(.x,"_rand"),.cols = contains("trend")) 
-  
+ 
+trends_space <- posterior_samples(fit = stanfit,
+                                 parm = "beta_space",
+                                 dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(trend = tr_f(mean),
+         trend_lci = tr_f(lci),
+         trend_uci = tr_f(uci),
+         trend_se = tr_f(sd),
+         abs_trend = abs(trend))%>% 
+  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend) %>% 
+  rename_with(.,~paste0(.x,"_space"),.cols = contains("trend")) 
+
 
 
 trend_comp <- trends_ns %>% 
@@ -196,12 +210,13 @@ trend_comp <- trends_ns %>%
   rename_with(.,~paste0(.x,"_ns"),.cols = contains("trend")) %>% 
   right_join(.,trends,by = "route") %>% 
   right_join(.,trends_rand,by = "route") %>% 
+  right_join(.,trends_space,by = "route") %>% 
   mutate(trend_dif = trend-trend_ns,
          trend_se_dif = trend_se - trend_se_ns)
 
 
 tcplot <- ggplot(data = trend_comp,
-                 aes(y = trend_ns,x = trend,colour = abs_trend_rand))+
+                 aes(y = trend_ns,x = trend,colour = trend_se_ns))+
   geom_abline(slope = 1,intercept = 0)+
   geom_point(alpha = 0.5)+
   scale_colour_viridis_c(aesthetics = "colour",direction = 1)+

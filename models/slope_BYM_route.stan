@@ -39,6 +39,7 @@ parameters {
   vector[ncounts] noise_raw;             // over-dispersion
 
   vector[nroutes] beta_raw_space;
+  vector[nroutes] beta_raw_rand;
   real BETA; 
 
   vector[nroutes] alpha_raw;
@@ -52,6 +53,7 @@ parameters {
  //real<lower=1> nu;  //optional heavy-tail df for t-distribution
   real<lower=0> sdobs;    // sd of observer effects
   real<lower=0> sdbeta_space;    // sd of slopes 
+ real<lower=0> sdbeta_rand;    // sd of slopes 
   real<lower=0> sdalpha;    // sd of intercepts
 
   
@@ -62,6 +64,7 @@ model {
 
 
   vector[ncounts] E;           // log_scale additive likelihood
+   vector[nroutes] beta_rand;
   vector[nroutes] beta_space;
  vector[nroutes] beta;
   vector[nroutes] alpha;
@@ -70,8 +73,9 @@ model {
 
 // covariate effect on intercepts and slopes
    beta_space = (sdbeta_space*beta_raw_space);
+   beta_rand = (sdbeta_rand*beta_raw_rand);
    
-   beta = beta_space + BETA;
+   beta = beta_space + beta_rand + BETA;
    alpha = (sdalpha*alpha_raw) + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
@@ -81,7 +85,9 @@ model {
   }
   
   
- 
+  beta_raw_rand ~ normal(0,1);//random slope effects
+  sum(beta_raw_rand) ~ normal(0,0.001*nroutes);
+
   
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
   noise_raw ~ normal(0,1); //~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
@@ -101,6 +107,7 @@ model {
   //spatial iCAR intercepts and slopes by strata
   sdalpha ~ normal(0,1); //prior on sd of intercept variation
   sdbeta_space ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.1 and 99% < 0.33
+  sdbeta_rand  ~ gamma(2,20);//~ normal(0,0.05); //boundary avoiding prior on sd of slope random variation
 
   beta_raw_space ~ icar_normal(nroutes, node1, node2);
   alpha_raw ~ icar_normal(nroutes, node1, node2);
@@ -122,8 +129,9 @@ model {
 
 // intercepts and slopes
    beta_space = (sdbeta_space*beta_raw_space);
+   beta_rand = (sdbeta_rand*beta_raw_rand);
    
-   beta = beta_space + BETA;
+   beta = beta_space + beta_rand + BETA;
     alpha = (sdalpha*alpha_raw) + ALPHA;
    noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;

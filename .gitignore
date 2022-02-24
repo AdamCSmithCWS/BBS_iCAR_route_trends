@@ -12,6 +12,9 @@ tmp_route_data/
 trajectories/
 *.exe
 temp.stan
+docs/
+trends_etc/
+
 
 
 
