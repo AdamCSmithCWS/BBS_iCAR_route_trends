@@ -5,6 +5,7 @@
 library(bbsBayes)
 library(tidyverse)
 library(cmdstanr)
+library(posterior)
 library(patchwork)
 library(sf)
 library(spdep)
@@ -26,9 +27,10 @@ firstYear = 2004
 lastYear = 2019
 
 scope = "RangeWide"
-
+check_conv = FALSE #set to TRUE to run convergence summary
 
 species = "Blue-headed Vireo"
+species = "Dickcissel"
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
 
@@ -49,17 +51,56 @@ csv_files_ns <- paste0(output_dir,"/",out_base_ns,"-",1:3,".csv")
 
 stanfit_ns <- as_cmdstan_fit(files = csv_files_ns)
 
+if(check_conv){
+  
+stanf_df_ns <- stanfit_ns$draws(format = "df")
+
+
+conv_summ <- summarise_draws(stanf_df_ns) %>% 
+  mutate(species = species,
+         model = out_base_ns)
+
+}
 out_base <- paste0(species_f,"_RangeWide_",firstYear,"_",lastYear)
 
 csv_files <- paste0(output_dir,"/",out_base,"-",1:3,".csv")
 
 stanfit <- as_cmdstan_fit(files = csv_files)
 
+if(check_conv){
+  
+stanf_df <- stanfit$draws(format = "df")
 
+
+conv_summ_out <- summarise_draws(stanf_df_ns) %>% 
+  mutate(species = species,
+         model = out_base) %>% 
+  bind_rows(conv_summ)
+
+
+failed_rhat <- conv_summ_out %>% 
+  filter(rhat > 1.05)
+
+failed_ess_bulk <- conv_summ_out %>% 
+  filter(ess_bulk < 100)
+
+
+write.csv(conv_summ_out,file = paste0("trends_etc/conv_summ_",out_base,".csv"))
+}
 # extract trends and abundances -------------------------------------------
 
 routes_df <- data.frame(routeF = jags_data$routeF,
-                      route = jags_data$route) %>% 
+                      route = jags_data$route,
+                      year = jags_data$r_year,
+                      obs = jags_data$obser) %>% 
+  group_by(route,routeF,obs) %>%
+  summarise(n_yr_obs = n(),
+            .groups = "drop") %>% 
+  group_by(route,routeF) %>% 
+  summarise(n_obs = n(),
+            mean_y_obs = mean(n_yr_obs),
+            max_y_obs = max(n_yr_obs),
+            .groups = "drop") %>% 
   distinct()
 
 tr_f <- function(x){
@@ -76,6 +117,9 @@ trends <- posterior_samples(fit = stanfit,
          trend_lci = tr_f(lci),
          trend_uci = tr_f(uci),
          trend_se = tr_f(sd))
+
+
+
 
 
 trends_ns <- posterior_samples(fit = stanfit_ns,
@@ -118,6 +162,52 @@ abund_ns <- posterior_samples(fit = stanfit_ns,
   select(route,abund,abund_lci,abund_uci,abund_se)
 
 
+abund_comp <- abund_ns %>% 
+  rename(abund_ns = abund,
+         abund_lci_ns = abund_lci,
+         abund_uci_ns = abund_uci,
+         abund_se_ns = abund_se) %>% 
+  right_join(.,abund,by = "route") %>% 
+  mutate(abund_dif = exp(log(abund)-log(abund_ns)),
+         abund_se_dif = exp(log(abund_se) - log(abund_se_ns)))
+
+# summarise the random component of the spatial beta --------
+# use the random compnent as a scaling on the beta comparison
+# large values of random == strong data that does not fit the spatial pattern
+
+trends_rand <- posterior_samples(fit = stanfit,
+                            parm = "beta_rand",
+                            dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(trend = tr_f(mean),
+         trend_lci = tr_f(lci),
+         trend_uci = tr_f(uci),
+         trend_se = tr_f(sd),
+         abs_trend = abs(trend))%>% 
+  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend) %>% 
+  rename_with(.,~paste0(.x,"_rand"),.cols = contains("trend")) 
+  
+
+
+trend_comp <- trends_ns %>% 
+  select(route,trend,trend_lci,trend_uci,trend_se) %>% 
+  rename_with(.,~paste0(.x,"_ns"),.cols = contains("trend")) %>% 
+  right_join(.,trends,by = "route") %>% 
+  right_join(.,trends_rand,by = "route") %>% 
+  mutate(trend_dif = trend-trend_ns,
+         trend_se_dif = trend_se - trend_se_ns)
+
+
+tcplot <- ggplot(data = trend_comp,
+                 aes(y = trend_ns,x = trend,colour = abs_trend_rand))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5)+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  theme_bw()
+
+print(tcplot)
 # generate route map ------------------------------------------------------
 strata_map  <- bbsBayes::load_map(stratify_by = strat)
 # 
