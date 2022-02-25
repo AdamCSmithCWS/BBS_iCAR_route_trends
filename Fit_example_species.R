@@ -38,7 +38,7 @@ species = "Blue-headed Vireo"
 
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
-for(spp in c("_","_Non_spatial_","_BYM_")){
+for(spp in c("_","_BYM_","_Non_spatial_")){
 out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
 
 
