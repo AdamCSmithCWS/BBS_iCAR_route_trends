@@ -1,22 +1,16 @@
 ## 1-step ahead, cross-validation of three route-level trend models for the BBS
-
+setwd("C:/GitHub/BBS_iCAR_route_trends/")
 library(bbsBayes)
 library(tidyverse)
 library(cmdstanr)
-# library(rstan)
-# rstan_options(auto_write = TRUE, javascript = FALSE)
-# library(shinystan)
 library(sf)
 library(spdep)
-# library(doParallel)
-# library(foreach)
 library(ggforce)
-#library(tidybayes)
-#source("functions/mungeCARdata4stan.R")
 source("functions/neighbours_define.R") ## function to define neighbourhood relationships
 source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
 source("functions/get_basemap_function.R") ## loads one of the bbsBayes strata maps
 source("functions/posterior_summary_functions.R") ## functions similar to tidybayes that work on cmdstanr output
+source("functions/initial_value_functions.R")
 ## changes captured in a commit on Nov 20, 2020
 
 
@@ -26,7 +20,6 @@ source("functions/posterior_summary_functions.R") ## functions similar to tidyba
 strat = "bbs_usgs"
 model = "slope"
 scope = "RangeWide"
-strat_data = stratify(by = strat)
 
 firstYear = 2004
 lastYear = 2019 # final year to consider
@@ -36,176 +29,29 @@ lastYear = 2019 # final year to consider
 minimumYear = 2011 
 
 species = "Blue-headed Vireo"
-#species = "Dickcissel"
-
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
-
-jags_data_inc = try(prepare_jags_data(strat_data = strat_data,
-                                      species_to_run = species,
-                                      model = model,
-                                      #n_knots = 10,
-                                      min_year = firstYear,
-                                      max_year = minimumYear,
-                                      min_n_routes = 1,
-                                      strata_rem = us_strata_remove),silent = TRUE) # this final argument removes all data from the US
-
-
-# strata map of one of the bbsBayes base maps
-# helps group and set boundaries for the route-level neighbours
-strata_map  <- get_basemap(strata_type = strat,
-                           transform_laea = TRUE,
-                           append_area_weights = FALSE)
-
-
-realized_strata_map = filter(strata_map,ST_12 %in% unique(jags_data_inc$strat_name))
-
-# Spatial boundaries set up --------------------
-
-# the iCAR (intrinsic Conditional AutoRegressive) spatial model uses neighbourhood structure
-# to share information on abundance and trend (intercept and slope) among BBS routes
-# 
-
-strata_list <- data.frame(ST_12 = unique(jags_data_inc$strat_name),
-                          strat = unique(jags_data_inc$strat))
-
-
-realized_strata_map <- inner_join(realized_strata_map,strata_list, by = "ST_12")
-
-
-strata_bounds <- st_union(realized_strata_map) #union to provide a simple border of the realised strata
-strata_bounds_buf = st_buffer(strata_bounds,dist = 300000) #buffering the realised strata by 300km
-
-
-
-jags_data_inc[["routeF"]] <- as.integer(factor((jags_data_inc$route)))
-
-route_map = unique(data.frame(route = jags_data_inc$route,
-                              routeF = jags_data_inc$routeF,
-                              strat = jags_data_inc$strat_name,
-                              Latitude = jags_data_inc$Latitude,
-                              Longitude = jags_data_inc$Longitude))
-
-
-# reconcile duplicate spatial locations -----------------------------------
-# adhoc way of separating different routes with the same starting coordinates
-# this shifts the starting coordinates of teh duplicates by ~1.5km to the North East 
-# ensures that the duplicates have a unique spatial location, but remain very close to
-# their original location and retain the correct neighbourhood relationships
-# these duplicates happen when a "new" route is established because some large proportion
-# of the end of a route is changed, but the start-point remains the same
-dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
-while(length(dups) > 0){
-  route_map[dups,"Latitude"] <- route_map[dups,"Latitude"]+0.01 #=0.01 decimal degrees ~ 1km
-  route_map[dups,"Longitude"] <- route_map[dups,"Longitude"]+0.01 #=0.01 decimal degrees ~ 1km
-  dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
-  
-}
-dups = which(duplicated(route_map[,c("Latitude","Longitude")])) 
-if(length(dups) > 0){stop(paste(spec,"ERROR - At least one duplicate route remains"))}
-
-
-route_map = st_as_sf(route_map,coords = c("Longitude","Latitude"))
-st_crs(route_map) <- 4269 #NAD83 commonly used by US federal agencies
-#load strata map
-
-
-
-
-route_map = st_transform(route_map,crs = st_crs(realized_strata_map))
-
-
-## returns the adjacency data necessary for the stan model
-## also exports maps and saved data objects to plot_dir
-car_stan_dat <- neighbours_define(real_strata_map = route_map,
-                                  strat_link_fill = 100000,
-                                  plot_neighbours = TRUE,
-                                  species = species,
-                                  plot_dir = "route_maps/",
-                                  plot_file = paste0("_CV_",scope,"_route_maps"),
-                                  save_plot_data = TRUE,
-                                  voronoi = TRUE,
-                                  alt_strat = "routeF",
-                                  add_map = realized_strata_map)
-
-
-
-
-
-
-# Remove the remaining routes from the bbsBayes stratified data -----------
-routes_inc <- route_map %>% 
-  data.frame() %>% 
-  select(route,routeF,strat) 
-
-
-
-strat_data_reduced <- strat_data
-strat_data_reduced$route_strat <- strat_data_reduced$route_strat[which(strat_data_reduced$route_strat$rt.uni %in% routes_inc$route),]
-strat_data_reduced$bird_strat <- strat_data_reduced$bird_strat[which(strat_data_reduced$bird_strat$rt.uni %in% routes_inc$route),]
-
-
-jags_data_red_allyears <- prepare_jags_data(strat_data = strat_data_reduced,
-                                            species_to_run = species,
-                                            model = model,
-                                            #n_knots = 10,
-                                            min_year = firstYear,
-                                            max_year = lastYear,
-                                            min_n_routes = 1)
-
-routes_inc_red <- unique(data.frame(strat_name = jags_data_red_allyears$strat_name,
-                                    route = jags_data_red_allyears$route))
-
-
-
-if(!any(routes_inc_red$route %in% routes_inc$route)){
-  stop(paste("Some routes in recent data are missing from original data"))
-}
-
-full_obs_df <- data.frame(count = jags_data_red_allyears$count,
-                          r_year = jags_data_red_allyears$r_year,
-                          year = jags_data_red_allyears$year,
-                          firstyr = jags_data_red_allyears$firstyr,
-                          route = jags_data_red_allyears$route,
-                          ObsN = jags_data_red_allyears$ObsN) %>% 
-  left_join(.,routes_inc, by = c("route")) %>% 
-  arrange(year)
-
-#identify the order in which the observers show up in the dataset
-obs_sort <- unique(full_obs_df$ObsN)
-# create an observer index that is constant across time
-full_obs_df$observer <- as.integer(factor(full_obs_df$ObsN,levels = obs_sort,ordered = TRUE))
-
-nroutes <- max(routes_inc$routeF)
-
-
-
-
-
-
-
-
-
 
 
 # CROSS-VALIDATION loop through the annual re-fitting --------------------------------------
 
-predictions_save_CAR <- NULL
-predictions_save_NonCAR <- NULL
 
-for(spp in c("_","_BYM_","_Non_spatial_")){
+for(sppn in c("iCAR","BYM","Non_spatial")){
   
+  load(paste0("data/",species_f,"CV_base_data.RData"))
   
   output_dir <- "output"
+  spp <- paste0("_",sppn,"_")
   
   
-  
-  out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
-  
+
+  predictions_save <- NULL
   
 
 for(ynext in (minimumYear+1):lastYear){
   
-  sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",ynext,"_CV_iCAR.RData")
+  out_base <- paste0(species_f,spp,firstYear,"_",ynext,"_CV")
+  
+  sp_file <- paste0(output_dir,"/",out_base,".RData")
   
   # setting up the fitting data ------------------------------------------
   
@@ -222,10 +68,13 @@ for(ynext in (minimumYear+1):lastYear){
                     nroutes = nroutes,
                     ncounts = length(obs_df_fit$count),
                     fixedyear = floor(max(obs_df_fit$year)/2))
+
+  if(spp != "_Non_spatial_"){
+    
   stan_data[["N_edges"]] = car_stan_dat$N_edges
   stan_data[["node1"]] = car_stan_dat$node1
   stan_data[["node2"]] = car_stan_dat$node2
-  
+  }  
   
   # setting up the prediction data ------------------------------------------
   
@@ -239,28 +88,18 @@ for(ynext in (minimumYear+1):lastYear){
   stan_data[["ncounts_pred"]] <- length(obs_df_predict$count)
   
   
-  mod.file = "models/slope_iCAR_route2_LFO_CV.stan"
+  mod.file = paste0("models/slope",spp,"route_LFO_CV.stan")
   
   ## compile model
   slope_model <- cmdstan_model(mod.file)
   
-  init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
-                               alpha_raw = rnorm(stan_data$nroutes,0,0.1),
-                               ALPHA = 0,
-                               BETA = 0,
-                               eta = 0,
-                               obs_raw = rnorm(stan_data$nobservers,0,0.1),
-                               sdnoise = 0.2,
-                               sdobs = 0.1,
-                               sdbeta_space = runif(1,0.01,0.1),
-                               sdbeta_rand = runif(1,0.01,0.1),
-                               beta_raw_space = rnorm(stan_data$nroutes,0,0.01),
-                               beta_raw_rand = rnorm(stan_data$nroutes,0,0.01))}
+  
+  init_def <- init_func_list[[sppn]]
   
   
   slope_stanfit <- slope_model$sample(
     data=stan_data,
-    refresh=100,
+    refresh=200,
     chains=3, iter_sampling=1000,
     iter_warmup=1000,
     parallel_chains = 3,
@@ -268,26 +107,14 @@ for(ynext in (minimumYear+1):lastYear){
     adapt_delta = 0.8,
     max_treedepth = 14,
     seed = 123,
-    init = init_def)
+    init = init_def,
+    output_dir = output_dir,
+    output_basename = out_base)
   
-  out_base <- paste0(species_f,"_",scope,"_",firstYear,"_CV_CAR_",ynext)
+
+
   
-  # export to csv and read in as rstan --------------------------------------
-  slope_stanfit$save_output_files(dir = output_dir,
-                                  basename = out_base,
-                                  random = FALSE,
-                                  timestamp = FALSE)
-  
-  csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
-  
-  
-  shiny_explore <- FALSE
-  if(shiny_explore){
-    sl_rstan <- rstan::read_stan_csv(csv_files)
-    launch_shinystan(as.shinystan(sl_rstan))
-    
-    loo_stan = loo(sl_rstan)
-  }
+
   
   log_lik_samples_full <- posterior_samples(fit = slope_stanfit,
                                             parm = "log_lik",
@@ -310,129 +137,29 @@ for(ynext in (minimumYear+1):lastYear){
   obs_df_predict_out <- bind_cols(obs_df_predict,log_lik_samples)
   obs_df_predict_out <- bind_cols(obs_df_predict_out,E_pred_samples)
   obs_df_predict_out$species <- species
-  
-  predictions_save_CAR <- bind_rows(predictions_save_CAR,obs_df_predict_out)
-  
-  
+  obs_df_predict_out$model <- sppn
+  obs_df_predict_out$base <- out_base
   
   
   
-  # nonSpatial model fit ----------------------------------------------------
+  predictions_save <- bind_rows(predictions_save,obs_df_predict_out)
   
-  mod.file.non = "models/slope_noniCAR_route2_LFO_CV.stan"
-  
-  ## removing the spatial input data
-  stan_data_non <- stan_data
-  stan_data_non[["N_edges"]] = NULL
-  stan_data_non[["node1"]] = NULL
-  stan_data_non[["node2"]] = NULL
-  
-  ## compile model
-  slope_model_non <- cmdstan_model(mod.file.non)
-  
-  init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
-                               alpha_raw = rnorm(stan_data$nroutes,0,0.1),
-                               ALPHA = 0,
-                               BETA = 0,
-                               eta = 0,
-                               obs_raw = rnorm(stan_data$nobservers,0,0.1),
-                               sdnoise = 0.2,
-                               sdobs = 0.1,
-                               #sdbeta_space = runif(1,0.01,0.1),
-                               sdbeta_rand = runif(1,0.01,0.1),
-                               #beta_raw_space = rnorm(stan_data$nroutes,0,0.01),
-                               beta_raw_rand = rnorm(stan_data$nroutes,0,0.01))}
+
+  print(paste("Finished",sppn,ynext))
   
   
-  slope_stanfit_non <- slope_model_non$sample(
-    data=stan_data_non,
-    refresh=100,
-    chains=3, iter_sampling=1000,
-    iter_warmup=1000,
-    parallel_chains = 3,
-    #pars = parms,
-    adapt_delta = 0.8,
-    max_treedepth = 14,
-    seed = 123,
-    init = init_def)
+  save(list = c("predictions_save"),file = paste0("output/",species_f,spp,"_pred_save.RData"))
   
   
-  
-  out_base_non <- paste0(species_f,"_",scope,"_",firstYear,"_CV_non_",ynext)
-  
-  # export to csv and read in as rstan --------------------------------------
-  slope_stanfit_non$save_output_files(dir = output_dir,
-                                      basename = out_base_non,
-                                      random = FALSE,
-                                      timestamp = FALSE)
-  
-  csv_files <- dir(output_dir,pattern = out_base_non,full.names = TRUE)
-  
-  
-  
-  log_lik_samples_full_non <- posterior_samples(fit = slope_stanfit_non,
-                                                parm = "log_lik",
-                                                dims = "i") 
-  
-  log_lik_samples <- log_lik_samples_full_non %>% 
-    posterior_sums(.,quantiles = NULL,dims = "i") 
-  names(log_lik_samples) <- paste0("log_lik_",names(log_lik_samples))
-  
-  
-  E_pred_samples_full_non <- posterior_samples(fit = slope_stanfit_non,
-                                               parm = "E_pred",
-                                               dims = "i") 
-  
-  E_pred_samples <- log_lik_samples_full_non %>% 
-    posterior_sums(.,quantiles = NULL,dims = "i") 
-  names(E_pred_samples) <- paste0("E_pred_",names(E_pred_samples))
-  
-  
-  obs_df_predict_out <- bind_cols(obs_df_predict,log_lik_samples)
-  obs_df_predict_out <- bind_cols(obs_df_predict_out,E_pred_samples)
-  obs_df_predict_out$species <- species
-  
-  predictions_save_NonCAR <- bind_rows(predictions_save_NonCAR,obs_df_predict_out)
-  
-  
-  
-  
-  save(list = c("log_lik_samples_full",
-                "E_pred_samples_full",
-                "slope_stanfit",
-                "log_lik_samples_full_non",
-                "E_pred_samples_full_non",
-                "slope_stanfit_non",
-                "stan_data",
-                "stan_data_non",
-                "obs_df_predict",
-                "predictions_save_NonCAR",
-                "predictions_save_CAR",
-                "ynext",
-                "sp_file",
-                "species_f",
-                "output_dir",
-                "out_base_non",
-                "out_base"),
-       file = sp_file)
-  
-  print(ynext)
 }
+  
+  
+ 
 
 
-predictions_save_NonCAR$model <- "NonSpatial"
-predictions_save_CAR$model <- "Spatial"
-
-pred_save = bind_rows(predictions_save_CAR,predictions_save_NonCAR)
-
-save(list = "pred_save",file = paste0("output/",species_f,"_pred_save.RData"))
 
 
-pred_save_allsp <- bind_rows(pred_save_allsp,pred_save)
-
-save(list = "pred_save_allsp",file = "temp_pred_save3.RData")
-
-}# end species loop
+}
 
 
 #stopCluster(cl = cluster)

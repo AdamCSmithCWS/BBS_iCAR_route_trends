@@ -46,7 +46,6 @@ out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
 
 output_dir <- "output"
 
-csv_files <- dir(output_dir,pattern = out_base,full.names = TRUE)
 
 sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
 
