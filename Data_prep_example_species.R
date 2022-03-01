@@ -13,7 +13,7 @@ library(spdep)
  library(ggforce)
 #library(tidybayes)
 #source("functions/mungeCARdata4stan.R")
-source("functions/neighbours_define.R") ## function to define neighbourhood relationships
+source("functions/neighbours_define_alt.R") ## function to define neighbourhood relationships
 source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
 source("functions/get_basemap_function.R") ## loads one of the bbsBayes strata maps
 source("functions/posterior_summary_functions.R") ## functions similar to tidybayes that work on cmdstanr output
@@ -117,7 +117,7 @@ route_map = st_transform(route_map,crs = st_crs(realized_strata_map))
 ## returns the adjacency data necessary for the stan model
 ## also exports maps and saved data objects to plot_dir
 car_stan_dat <- neighbours_define(real_strata_map = route_map,
-                  strat_link_fill = 100000,
+                  #strat_link_fill = 100000,
                   plot_neighbours = TRUE,
                   species = species,
                   plot_dir = "data/",
