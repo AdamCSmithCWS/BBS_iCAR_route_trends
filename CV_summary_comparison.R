@@ -73,7 +73,8 @@ diffs <- cv_sum %>%
          BYM_Non_spatial = BYM-Non_spatial) %>% 
   left_join(.,n_obs,by = "route")
 
-
+cv_sum <- cv_sum %>% 
+  left_join(.,n_obs,by = "route")
 
 
 diffs_p1 <- ggplot(data = diffs,aes(x = count+1,y = iCAR_BYM))+
@@ -152,19 +153,19 @@ spat_nonzoom = ggplot(data = diffs,aes(y = iCAR_Non_spatial,x = BYM_Non_spatial)
 print(spat_non + spat_nonzoom)
 
 
-m1 = brm(log_lik_mean ~ model*Year + (1|E_pred_i),
-         data = cv_sum)
+m1 = brm(log_lik_mean ~ model*max_nyears + (1|E_pred_i),
+         data = cv_sum,
+         save_pars = save_pars(all = TRUE))
+
+
+m2 = brm(log_lik_mean ~ model + max_nyears + (1|E_pred_i),
+         data = cv_sum,
+         save_pars = save_pars(all = TRUE))
 summary(m1)
-
-
-m2 = brm(log_lik_mean ~ model + (1|E_pred_i),
-         data = cv_sum)
 summary(m2)
+lm1 = loo(m1,moment_match = TRUE)
+lm2 = loo(m2,moment_match = TRUE)
 
-
-m3 = brm(log_lik_mean ~ model + (1|E_pred_i),
-         data = cv_sum)
-summary(m3)
 
 
   
