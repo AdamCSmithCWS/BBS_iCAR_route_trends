@@ -6,7 +6,7 @@ library(cmdstanr)
 library(sf)
 library(spdep)
 library(ggforce)
-source("functions/neighbours_define.R") ## function to define neighbourhood relationships
+source("functions/neighbours_define_alt.R") ## function to define neighbourhood relationships
 source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
 source("functions/get_basemap_function.R") ## loads one of the bbsBayes strata maps
 source("functions/posterior_summary_functions.R") ## functions similar to tidybayes that work on cmdstanr output
