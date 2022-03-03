@@ -74,7 +74,13 @@ diffs <- cv_sum %>%
   left_join(.,n_obs,by = "route")
 
 cv_sum <- cv_sum %>% 
-  left_join(.,n_obs,by = "route")
+  left_join(.,n_obs,by = "route") %>% 
+  mutate(model = factor(model,levels = c("Non_spatial","BYM","iCAR"),
+                        ordered = TRUE))
+
+save(list = c("diffs","cv_sum"),
+     file = "data/example_trend_comparisons.RData")
+
 
 
 diffs_p1 <- ggplot(data = diffs,aes(x = count+1,y = iCAR_BYM))+
@@ -161,6 +167,8 @@ m1 = brm(log_lik_mean ~ model*max_nyears + (1|E_pred_i),
 m2 = brm(log_lik_mean ~ model + max_nyears + (1|E_pred_i),
          data = cv_sum,
          save_pars = save_pars(all = TRUE))
+
+
 summary(m1)
 summary(m2)
 lm1 = loo(m1,moment_match = TRUE)

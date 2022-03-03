@@ -2,6 +2,7 @@
 library(spdep)
 library(sf)
 library(tidyverse)
+library(patchwork)
 
 
 # 1 spatial set-up demo -----------------------------------------------------
@@ -41,9 +42,45 @@ dev.off()
 # 2 trend maps comparing 3 models -----------------------------------------
 
 
+load("Figures/example_trend_map_data.RData")
+
+strata_map  <- bbsBayes::load_map(stratify_by = "bbs_usgs")
+
+
+strata_bounds <- st_union(trend_plot_map) #union to provide a simple border of the realised strata
+bb = st_bbox(strata_bounds)
+xlms = as.numeric(c(bb$xmin,bb$xmax))
+ylms = as.numeric(c(bb$ymin,bb$ymax))
+
+
+breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
+lgnd_head <- "Trend\n"
+trend_title <- "Trend"
+labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+labls = paste0(labls, " %/year")
+trend_plot_map$Tplot <- cut(trend_plot_map$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+
+map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
+                 "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
+names(map_palette) <- labls
+
+
+fig = ggplot(trend_plot_map)+
+  #geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(data = strata_map,colour = gray(0.8),fill = NA)+
+  geom_sf(aes(colour = Tplot,size = abund))+
+  scale_size_continuous(range = c(0.05,2),
+                        name = "Mean Abundance")+
+  scale_colour_manual(values = map_palette, aesthetics = c("colour"),
+                      guide = guide_legend(reverse=TRUE),
+                      name = paste0(lgnd_head,2004,"-",2019))+
+  coord_sf(xlim = xlms,ylim = ylms)+
+  facet_wrap(vars(version),nrow = 3)+
+  theme_bw()
+
 
 f = 2
-h = 5
+h = 10
 w = 7
 
 pdf(file = paste0("Figures/Figure_",f,".pdf"),
@@ -53,8 +90,7 @@ print(fig)
 dev.off()
 
 # 3 Trend correlations among models ------------------------------------------------------
-
-
+# iCAR vs non-spatial trends and iCAR vs BYM trends
 f = 3
 h = 5
 w = 7
@@ -94,6 +130,26 @@ dev.off()
 
 # 5 Cross validation results for example species --------------------------
 
+
+load("data/example_trend_comparisons.RData")
+
+#re-orient, adjust x-labels, include count of points on either side
+
+## or replace with trend-biplot of two spatial models
+diffs_p1 <- ggplot(data = diffs,aes(x = max_nyears,y = iCAR_BYM))+
+  geom_point(alpha = 0.2)+
+  geom_smooth()+
+  theme_classic()
+diffs_p2 <- ggplot(data = diffs,aes(x = max_nyears,y = iCAR_Non_spatial))+
+  geom_point(alpha = 0.2)+
+  geom_smooth()+
+  theme_classic()+
+  xlab("Maximum year span of single observer")
+diffs_p3 <- ggplot(data = diffs,aes(x = max_nyears,y = BYM_Non_spatial))+
+  geom_point(alpha = 0.2)+
+  geom_smooth()+
+  theme_classic()
+fig <- (diffs_p1 + diffs_p2 + diffs_p3)
 
 
 f = 5

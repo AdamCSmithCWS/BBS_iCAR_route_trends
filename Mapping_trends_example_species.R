@@ -36,9 +36,6 @@ species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
 
 
-
-# SPECIES LOOP ------------------------------------------------------------
-
 output_dir <- "output"
 sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
 
@@ -227,6 +224,9 @@ trends_space <- posterior_samples(fit = stanfit__BYM,
   select(route,trend,trend_lci,trend_uci,trend_se,abs_trend) %>% 
   rename_with(.,~paste0(.x,"_space"),.cols = contains("trend")) 
 
+save(list = c("trend_comp",
+              "abund_comp"),
+     file = "Figures/example_trend_comparison_data.RData")
 
 
 ### compare the differences to the number of routes, and years with single obs etc.
@@ -275,6 +275,8 @@ trend_plot_map <- route_map %>%
   left_join(.,trend_long,by = "route") %>% 
   left_join(.,abund_long,by = c("route","version"))
 
+save(list = c("trend_plot_map"),
+     file = "Figures/example_trend_map_data.RData")
 # trend_plot_map_ns <- route_map %>% 
 #   left_join(.,trends_ns,by = "route") %>% 
 #   left_join(.,abund,by = "route")
