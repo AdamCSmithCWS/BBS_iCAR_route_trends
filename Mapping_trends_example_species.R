@@ -225,7 +225,9 @@ trends_space <- posterior_samples(fit = stanfit__BYM,
   rename_with(.,~paste0(.x,"_space"),.cols = contains("trend")) 
 
 save(list = c("trend_comp",
-              "abund_comp"),
+              "abund_comp",
+              "trends_rand",
+              "trends_space"),
      file = "Figures/example_trend_comparison_data.RData")
 
 

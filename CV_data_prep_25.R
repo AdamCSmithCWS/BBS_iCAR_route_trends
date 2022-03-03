@@ -31,39 +31,47 @@ minimumYear = 2011
 
 species_list <- strat_data$species_strat$english
 
-#series of if statements that skip analysing hybrids, composite species groups, etc.
-if(grepl(pattern = "hybrid",x = species)){next}
-if(grepl(pattern = "unid.",x = species)){next}
-if(grepl(pattern = " x ",x = species)){next}
-if(grepl(pattern = "/",fixed = TRUE,x = species)){next}
-if(substr(x = species,1,1) == "("){next}
+#skip analysing hybrids, composite species groups, etc.
+sp_drop <- unique(c(
+  which(grepl(pattern = "hybrid",x = species_list)),
+  which(grepl(pattern = "unid.",x = species_list)),
+  which(grepl(pattern = " x ",x = species_list)),
+  which(grepl(pattern = "/",x = species_list)),
+  which(substr(x = species_list,1,1) == "(")))
 
+true_species <- species_list[-sp_drop]
 
-pred_save_allsp <- NULL
+ncounts_sp <- strat_data$bird_strat %>% 
+  filter(Year >= firstYear,
+         Year <= minimumYear) %>% 
+  group_by(AOU) %>% 
+  summarise(n_counts = n(),
+            .groups = "drop") %>% 
+  left_join(.,strat_data$species_strat,
+            by = c("AOU" = "sp.bbs")) %>% 
+  filter(english %in% true_species,
+         n_counts > 500)
 
-sp_w_trends <- list.files(path = "Figures/images/")
-sp_w_trends <- gsub(gsub(sp_w_trends,pattern = "_Trends_2004.png",replacement = ""),pattern = "_",replacement = " ")
-
-rselsp <- sample(sp_w_trends,50)
-
-selSpecies <- unique(c(selSpecies,rselsp))
-
-
-for(species in selSpecies[c(54:40)]){
+set.seed(1)
+sp_sel <- ncounts_sp %>% 
+  select(english) %>% 
+  slice_sample(.,n = 25) %>% 
+  unlist() %>% 
+  as.character()
   
+
+
+
+for(species in sp_sel){
+  
+  #removing characters that complicate directory names
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
   species_f <- gsub(species_f,pattern = "'",replacement = "",fixed = T)
   
-  # if(file.exists(sp_file)){next}
-  #   
-
-  
-
 
 jags_data_inc = prepare_jags_data(strat_data = strat_data,
                                       species_to_run = species,
                                       model = model,
-                                      #n_knots = 10,
                                       min_year = firstYear,
                                       max_year = minimumYear,
                                       min_n_routes = 1) # this final argument removes all data from the US
@@ -110,7 +118,7 @@ route_map = unique(data.frame(route = jags_data_inc$route,
 # this shifts the starting coordinates of teh duplicates by ~1.5km to the North East 
 # ensures that the duplicates have a unique spatial location, but remain very close to
 # their original location and retain the correct neighbourhood relationships
-# these duplicates happen when a "new" route is established because some large proportion
+# these duplicates can happen when a "new" route is established because some large proportion
 # of the end of a route is changed, but the start-point remains the same
 dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
 while(length(dups) > 0){
@@ -165,7 +173,6 @@ strat_data_reduced$bird_strat <- strat_data_reduced$bird_strat[which(strat_data_
 jags_data_red_allyears <- prepare_jags_data(strat_data = strat_data_reduced,
                                             species_to_run = species,
                                             model = model,
-                                            #n_knots = 10,
                                             min_year = firstYear,
                                             max_year = lastYear,
                                             min_n_routes = 1)
@@ -206,4 +213,5 @@ save(list = c("full_obs_df","route_map","routes_inc","car_stan_dat",
      file = paste0("data/",species_f,"CV_base_data.RData"))
 
 
+}
 
