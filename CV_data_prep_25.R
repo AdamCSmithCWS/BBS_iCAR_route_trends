@@ -60,9 +60,11 @@ sp_sel <- ncounts_sp %>%
   as.character()
   
 
+save(list = "sp_sel",
+     file = "Data/sp_sel.RData")
 
 
-for(species in sp_sel){
+for(species in sp_sel[-c(1:5)]){
   
   #removing characters that complicate directory names
   species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)

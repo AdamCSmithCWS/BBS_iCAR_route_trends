@@ -124,8 +124,14 @@ neighbours_define <- function(real_strata_map = realized_strata_map, #sf map of 
     if(buffer){
     cov_hull_buf = st_buffer(st_union(centres),dist = strat_link_fill)
     if(length(cov_hull_buf[[1]]) > 1){ ### gradually increases buffer until all sites are linked
+      scale_rate <- 1.1
+      jj <- 0
       while(length(cov_hull_buf[[1]]) > 1){
-        strat_link_fill <- strat_link_fill*1.1
+        jj <- jj+1
+        if(jj > 3){ #increases the rate of increase if it's taking a while
+          scale_rate <- scale_rate+(jj/5)
+        }
+        strat_link_fill <- strat_link_fill*scale_rate
         cov_hull_buf = st_buffer(st_union(centres),dist = strat_link_fill)
       }
     }

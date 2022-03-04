@@ -91,8 +91,43 @@ dev.off()
 
 # 3 Trend correlations among models ------------------------------------------------------
 # iCAR vs non-spatial trends and iCAR vs BYM trends
+
+load("Figures/example_trend_comparison_data.RData")
+
+
+tcplot <- ggplot(data = trend_comp,
+                 aes(x = trend_BYM,y = trend_Non_spatial,colour = trend_se_BYM))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5,size = 0.75)+
+  ylab("Trend non-spatial model")+
+  xlab("Trend BYM model")+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  theme_classic()+
+  scale_y_continuous(limits = c(-13,13))+
+  scale_x_continuous(limits = c(-13,13))+
+  theme(legend.position = "none")
+
+tcplot2 <- ggplot(data = trend_comp,
+                  aes(y = trend_iCAR,x = trend_BYM,colour = trend_se_BYM))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5,size = 0.75)+
+  ylab("Trend iCAR model")+
+  xlab("Trend BYM model")+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  theme_classic()+
+  scale_y_continuous(limits = c(-13,13))+
+  scale_x_continuous(limits = c(-13,13))+
+  theme(legend.position = "none")
+
+
+fig <- (tcplot + tcplot2)+
+  plot_layout(ncol = 2,
+              guides = "collect")
+
+
+
 f = 3
-h = 5
+h = 4
 w = 7
 
 pdf(file = paste0("Figures/Figure_",f,".pdf"),
@@ -104,8 +139,37 @@ dev.off()
 # 4 ABundance correlations among models -----------------------------------
 
 
+tcplot <- ggplot(data = abund_comp,
+                 aes(x = abund_BYM,y = abund_Non_spatial,colour = abund_se_BYM))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5,size = 0.75)+
+  ylab("abund non-spatial model")+
+  xlab("abund BYM model")+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  theme_classic()+
+  scale_y_continuous(limits = c(0,13))+
+  scale_x_continuous(limits = c(0,13))+
+  theme(legend.position = "none")
+
+tcplot2 <- ggplot(data = abund_comp,
+                  aes(y = abund_iCAR,x = abund_BYM,colour = abund_se_BYM))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5,size = 0.75)+
+  ylab("abund iCAR model")+
+  xlab("abund BYM model")+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  theme_classic()+
+  scale_y_continuous(limits = c(0,13))+
+  scale_x_continuous(limits = c(0,13))+
+  theme(legend.position = "none")
+
+
+fig <- (tcplot + tcplot2)+
+  plot_layout(ncol = 2,
+              guides = "collect")
+
 f = 4
-h = 5
+h = 4
 w = 7
 
 pdf(file = paste0("Figures/Figure_",f,".pdf"),
@@ -131,7 +195,7 @@ dev.off()
 # 5 Cross validation results for example species --------------------------
 
 
-load("data/example_trend_comparisons.RData")
+load("data/example_cv_comparisons.RData")
 
 #re-orient, adjust x-labels, include count of points on either side
 
@@ -151,6 +215,8 @@ diffs_p3 <- ggplot(data = diffs,aes(x = max_nyears,y = BYM_Non_spatial))+
   theme_classic()
 fig <- (diffs_p1 + diffs_p2 + diffs_p3)
 
+
+comp = ggplot(data = cv_sum,)
 
 f = 5
 h = 5

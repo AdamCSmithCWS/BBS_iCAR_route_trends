@@ -79,7 +79,7 @@ cv_sum <- cv_sum %>%
                         ordered = TRUE))
 
 save(list = c("diffs","cv_sum"),
-     file = "data/example_trend_comparisons.RData")
+     file = "data/example_cv_comparisons.RData")
 
 
 
