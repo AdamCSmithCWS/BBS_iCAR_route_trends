@@ -29,6 +29,8 @@ lastYear = 2019 # final year to consider
 # similar to "L" in Burkner et al 2020 (https://doi.org/10.1080/00949655.2020.1783262)
 minimumYear = 2011 
 
+species = "Grasshopper Sparrow"
+species = "Blue Jay"
 species = "Blue-headed Vireo"
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
@@ -80,6 +82,8 @@ cv_sum <- cv_sum %>%
 
 save(list = c("diffs","cv_sum"),
      file = "data/example_cv_comparisons.RData")
+# save(list = c("diffs","cv_sum"),
+#      file = "data/GRSP_cv_comparisons.RData")
 
 
 

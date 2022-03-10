@@ -58,12 +58,17 @@ lgnd_head <- "Trend\n"
 trend_title <- "Trend"
 labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
 labls = paste0(labls, " %/year")
-trend_plot_map$Tplot <- cut(trend_plot_map$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
 
 map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
                  "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
 names(map_palette) <- labls
 
+trend_plot_map <- trend_plot_map %>% 
+  mutate(Tplot = cut(trend,breaks = c(-Inf, breaks, Inf),labels = labls),
+         Model = factor(version, levels = c("_iCAR",
+                                            "_BYM",
+                                            "_Non_spatial"),
+                        labels = c("iCAR","BYM","Non-spatial")))
 
 fig = ggplot(trend_plot_map)+
   #geom_sf(data = realized_strata_map,colour = gray(0.8),fill = NA)+
@@ -75,7 +80,7 @@ fig = ggplot(trend_plot_map)+
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head,2004,"-",2019))+
   coord_sf(xlim = xlms,ylim = ylms)+
-  facet_wrap(vars(version),nrow = 3)+
+  facet_wrap(vars(Model),nrow = 3)+
   theme_bw()
 
 
@@ -198,25 +203,57 @@ dev.off()
 load("data/example_cv_comparisons.RData")
 
 #re-orient, adjust x-labels, include count of points on either side
+# 
+# ## or replace with trend-biplot of two spatial models
+# diffs_p1 <- ggplot(data = diffs,aes(x = max_nyears,y = iCAR_BYM))+
+#   geom_point(alpha = 0.2)+
+#   geom_smooth()+
+#   theme_classic()
+# diffs_p2 <- ggplot(data = diffs,aes(x = max_nyears,y = iCAR_Non_spatial))+
+#   geom_point(alpha = 0.2)+
+#   geom_smooth()+
+#   theme_classic()+
+#   xlab("Maximum year span of single observer")
+# diffs_p3 <- ggplot(data = diffs,aes(x = max_nyears,y = BYM_Non_spatial))+
+#   geom_point(alpha = 0.2)+
+#   geom_smooth()+
+#   theme_classic()
+# fig <- (diffs_p1 + diffs_p2 + diffs_p3)
 
-## or replace with trend-biplot of two spatial models
-diffs_p1 <- ggplot(data = diffs,aes(x = max_nyears,y = iCAR_BYM))+
-  geom_point(alpha = 0.2)+
-  geom_smooth()+
+
+
+diffs <- diffs %>% 
+  mutate(lcount = log(count+1,base = 10))
+tcplot <- ggplot(data = diffs,
+                 aes(x = BYM,y = Non_spatial,colour = lcount))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5,size = 0.75)+
+  ylab("Non-spatial model")+
+  xlab("BYM model")+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  # scale_y_continuous(limits = c(0,13))+
+  # scale_x_continuous(limits = c(0,13))+
+  #theme(legend.position = "none")+
   theme_classic()
-diffs_p2 <- ggplot(data = diffs,aes(x = max_nyears,y = iCAR_Non_spatial))+
-  geom_point(alpha = 0.2)+
-  geom_smooth()+
-  theme_classic()+
-  xlab("Maximum year span of single observer")
-diffs_p3 <- ggplot(data = diffs,aes(x = max_nyears,y = BYM_Non_spatial))+
-  geom_point(alpha = 0.2)+
-  geom_smooth()+
+
+tcplot2 <- ggplot(data = diffs,
+                 aes(x = BYM,y = iCAR,colour = lcount))+
+  geom_abline(slope = 1,intercept = 0)+
+  geom_point(alpha = 0.5,size = 0.75)+
+  ylab("iCAR model")+
+  xlab("BYM model")+
+  scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+  # scale_y_continuous(limits = c(0,13))+
+  # scale_x_continuous(limits = c(0,13))+
+  #theme(legend.position = "none")+
   theme_classic()
-fig <- (diffs_p1 + diffs_p2 + diffs_p3)
 
 
-comp = ggplot(data = cv_sum,)
+fig <- (tcplot + tcplot2)+
+  plot_layout(ncol = 2,
+              guides = "collect")
+
+print(fig)
 
 f = 5
 h = 5

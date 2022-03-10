@@ -30,23 +30,34 @@ scope = "RangeWide"
 check_conv = TRUE #set to TRUE to run convergence summary
 conv_summary <- NULL
 
-species = "Blue-headed Vireo"
-#species = "Dickcissel"
-species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
 
+load("Data/sp_sel.RData")
 
+
+for(species in sp_sel[1:5]){
+  ##########
+  ### Currently not working - needs to have full time-series models run
+  ### with the same data-saving process as for example species
+  ### remove the use of CV-based results, they don't include 2019
+  #########
+  
+  species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
+  species_f <- gsub(species_f,pattern = "'",replacement = "",fixed = T)
+  
+  
 output_dir <- "output"
 sp_file <- paste0(output_dir,"/",species_f,"_",scope,"_",firstYear,"_",lastYear,"_slope_route_iCAR.RData")
 
-load(sp_file) 
+# load(sp_file) 
+load(paste0("data/",species_f,"CV_base_data.RData"))
 
 output_dir <- "output"
 # for(spp in c("_","_BYM_","_Non_spatial_")){
   out_base <- paste0(species_f,"_",firstYear,"_",lastYear)
 #   
 
-out_base_Non_spatial <- paste0(species_f,"_Non_spatial_",firstYear,"_",lastYear)
+out_base_Non_spatial <- paste0(species_f,"_Non_spatial_",firstYear,"_",lastYear,"_CV")
 
 csv_files_Non_spatial <- paste0(output_dir,"/",out_base_Non_spatial,"-",1:3,".csv")
 
@@ -63,7 +74,7 @@ conv_summ <- summarise_draws(stanf_df_Non_spatial) %>%
 conv_summary <- bind_rows(conv_summary,conv_summ)
 
 }
-out_base_iCAR <- paste0(species_f,"_",firstYear,"_",lastYear)
+out_base_iCAR <- paste0(species_f,"_iCAR_",firstYear,"_",lastYear,"_CV")
 
 csv_files_iCAR <- paste0(output_dir,"/",out_base_iCAR,"-",1:3,".csv")
 
@@ -81,20 +92,20 @@ if(check_conv){
   
 }
 
-out_base__BYM <- paste0(species_f,"_BYM_",firstYear,"_",lastYear)
+out_base_BYM <- paste0(species_f,"_BYM_",firstYear,"_",lastYear,"_CV")
 
-csv_files__BYM <- paste0(output_dir,"/",out_base__BYM,"-",1:3,".csv")
+csv_files_BYM <- paste0(output_dir,"/",out_base_BYM,"-",1:3,".csv")
 
-stanfit__BYM <- as_cmdstan_fit(files = csv_files__BYM)
+stanfit_BYM <- as_cmdstan_fit(files = csv_files_BYM)
 
 if(check_conv){
   
-  stanf_df__BYM <- stanfit__BYM$draws(format = "df")
+  stanf_df_BYM <- stanfit_BYM$draws(format = "df")
   
   
   conv_summ <- summarise_draws(stanf_df__BYM) %>% 
     mutate(species = species,
-           model = out_base__BYM)
+           model = out_base_BYM)
   conv_summary <- bind_rows(conv_summary,conv_summ)
   
 
