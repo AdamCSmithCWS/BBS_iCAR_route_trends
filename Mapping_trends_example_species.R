@@ -160,6 +160,10 @@ for(sppn in c("_iCAR","_BYM","_Non_spatial")){
     left_join(alpha_sampls,by = c(".draw","routeF"))
   
   ### now calculate mutate(index = exp(beta*(y-midyear) + alpha))
+
+  
+  
+    ### then link to stratum_df and calculate composite trends
   
   ### also compare the SE of just spatial trends vs full trends with hyperparameter
 # Trend gather ------------------------------------------------------------
