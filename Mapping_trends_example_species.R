@@ -123,7 +123,7 @@ routes_df <- data.frame(routeF = jags_data$routeF,
   group_by(route,routeF,obs,stratum) %>%
   summarise(n_yr_obs = n(),
             .groups = "drop") %>% 
-  group_by(route,routeF) %>% 
+  group_by(route,routeF,stratum) %>% 
   summarise(n_obs = n(),
             mean_y_obs = mean(n_yr_obs),
             max_y_obs = max(n_yr_obs),
@@ -136,6 +136,8 @@ tr_f <- function(x){
 
 trend_long <- NULL
 abund_long <- NULL
+composite_trends_out <- NULL
+trajs_out <- NULL
 for(sppn in c("_iCAR","_BYM","_Non_spatial")){
 
   if(sppn == "_iCAR"){stanfit <- stanfit_iCAR}
@@ -158,12 +160,54 @@ for(sppn in c("_iCAR","_BYM","_Non_spatial")){
   
   trajs <- beta_sampls %>% 
     left_join(alpha_sampls,by = c(".draw","routeF"))
+  ind_f <- function(b,a,y,m){
+    i <- exp(b*(y-m)+a)
+    return(i)
+  }
   
-  ### now calculate mutate(index = exp(beta*(y-midyear) + alpha))
+  for(yy in 1:stan_data$nyears){
+    trajs <- trajs %>% 
+      mutate(tmp_i = ind_f(beta,alpha,yy,stan_data$fixedyear)) %>% 
+      rename_with(., ~gsub(pattern = "tmp_i",
+                           replacement = paste0("ind_",yy),
+                           .x,
+                           fixed = TRUE))
+  }
+  
+  trajs <- trajs %>% 
+    left_join(.,routes_df,by = "routeF") %>% 
+    mutate(version = sppn)
 
+  trajs <- trajs %>% 
+    mutate(version = sppn)
+  
+  trajs_out <- trajs_out %>% 
+    bind_rows(.,trajs) ## saving trajectory posterior samples for future use
+    ### now calculate composite trends
+  
+  tr2_f <- function(x,y,ny){
+    t <- (((x/y)^(1/ny))-1)*100
+    return(t)
+  }
   
   
-    ### then link to stratum_df and calculate composite trends
+  composite_trends <- trajs %>% 
+    group_by(stratum,.draw) %>% 
+    summarise(ind1 = sum(ind_1),
+              ind2 = sum(ind_16),
+              n_routes = n(),
+              t = tr2_f(ind2,ind1,15)) %>% 
+    group_by(stratum) %>% 
+    summarise(n_routes = mean(n_routes),
+              trend = mean(t),
+              trend_med = median(t),
+              trend_lci = quantile(t,0.025),
+              trend_uci = quantile(t,0.975),
+              trend_Wci = trend_uci - trend_lci) %>% 
+    mutate(version = sppn)
+  
+  composite_trends_out <- composite_trends_out %>% 
+    bind_rows(.,composite_trends)
   
   ### also compare the SE of just spatial trends vs full trends with hyperparameter
 # Trend gather ------------------------------------------------------------
