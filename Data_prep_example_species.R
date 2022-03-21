@@ -33,10 +33,10 @@ lastYear = 2019
 
 scope = "RangeWide"
 
-
+species = "Eurasian Collared-Dove"
 species = "Blue-headed Vireo"
 #species = "Dickcissel"
-
+output_dir <- "output"
 species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
  
@@ -50,6 +50,14 @@ species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
                              max_year = lastYear,
                              min_n_routes = 1)# spatial neighbourhood define --------------------------------------------
 
+ jags_data = bbsBayes::prepare_data(strat_data = strat_data,
+                               species_to_run = species,
+                               model = model,
+                               #n_knots = 10,
+                               min_year = firstYear,
+                               max_year = lastYear,
+                               min_n_routes = 1)# spatial neighbourhood define --------------------------------------------
+ 
  # strata map of one of the bbsBayes base maps
  # helps group and set boundaries for the route-level neighbours
   strata_map  <- get_basemap(strata_type = strat,

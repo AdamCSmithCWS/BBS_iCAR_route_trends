@@ -99,6 +99,23 @@ dev.off()
 
 load("Figures/example_trend_comparison_data.RData")
 
+# trend_comp <- trend_comp %>% 
+#   mutate(dif_iCAR_Non_spatial = abs(trend_iCAR - trend_Non_spatial))
+# tcplottemp <- ggplot(data = trend_comp,
+#                  aes(x = trend_se_iCAR,y = trend_se_Non_spatial,colour = dif_iCAR_Non_spatial))+
+#   geom_abline(slope = 1,intercept = 0)+
+#   geom_point(alpha = 0.5,size = 0.75)+
+#   ylab("SE-Trend non-spatial model")+
+#   xlab("SE-Trend iCAR model")+
+#   scale_colour_viridis_c(aesthetics = "colour",direction = 1)+
+#   theme_classic()+
+#   # scale_y_continuous(limits = c(-13,13))+
+#   # scale_x_continuous(limits = c(-13,13))+
+#   theme()#legend.position = "none")
+# print(tcplottemp)
+
+
+
 
 tcplot <- ggplot(data = trend_comp,
                  aes(x = trend_BYM,y = trend_Non_spatial,colour = trend_se_BYM))+

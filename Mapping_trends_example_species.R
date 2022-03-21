@@ -109,13 +109,18 @@ failed_ess_bulk <- conv_summary %>%
 
 write.csv(conv_summary,file = paste0("trends_etc/conv_summ_",out_base,".csv"))
 }
+
+
+
+
 # extract trends and abundances -------------------------------------------
 
 routes_df <- data.frame(routeF = jags_data$routeF,
                       route = jags_data$route,
                       year = jags_data$r_year,
-                      obs = jags_data$obser) %>% 
-  group_by(route,routeF,obs) %>%
+                      obs = jags_data$obser,
+                      stratum = jags_data$strat_name) %>% 
+  group_by(route,routeF,obs,stratum) %>%
   summarise(n_yr_obs = n(),
             .groups = "drop") %>% 
   group_by(route,routeF) %>% 
@@ -138,6 +143,25 @@ for(sppn in c("_iCAR","_BYM","_Non_spatial")){
   if(sppn == "_Non_spatial"){stanfit <- stanfit_Non_spatial}
   
 
+# route-level annual predictions ------------------------------------------
+
+  beta_sampls <- posterior_samples(fit = stanfit,
+                    parm = "beta",
+                    dims = "routeF") %>% 
+    rename(beta = .value) %>% 
+    select(.draw,beta,routeF)
+  alpha_sampls <- posterior_samples(fit = stanfit,
+                                   parm = "alpha",
+                                   dims = "routeF") %>% 
+    rename(alpha = .value) %>% 
+    select(.draw,alpha,routeF)
+  
+  trajs <- beta_sampls %>% 
+    left_join(alpha_sampls,by = c(".draw","routeF"))
+  
+  ### now calculate mutate(index = exp(beta*(y-midyear) + alpha))
+  
+  ### also compare the SE of just spatial trends vs full trends with hyperparameter
 # Trend gather ------------------------------------------------------------
 
   
@@ -150,8 +174,9 @@ trendst <- posterior_samples(fit = stanfit,
   mutate(trend = tr_f(mean),
          trend_lci = tr_f(lci),
          trend_uci = tr_f(uci),
-         trend_se = tr_f(sd))%>% 
-  select(route,trend,trend_lci,trend_uci,trend_se)
+         trend_se = tr_f(sd),
+         trend_Wci = trend_uci-trend_lci)%>% 
+  select(route,trend,trend_lci,trend_uci,trend_se,trend_Wci)
 
 trend_ct <- trendst %>% 
   rename_with(.,~paste0(.x,sppn),.cols = contains("trend"))
@@ -177,8 +202,9 @@ abundst <- posterior_samples(fit = stanfit,
   mutate(abund = exp(mean),
          abund_lci = exp(lci),
          abund_uci = exp(uci),
-         abund_se = exp(sd))%>% 
-  select(route,abund,abund_lci,abund_uci,abund_se)
+         abund_se = exp(sd),
+         abund_Wci = abund_uci-abund_lci)%>% 
+  select(route,abund,abund_lci,abund_uci,abund_se,abund_Wci)
 abund_ct <- abundst %>% 
   rename_with(.,~paste0(.x,sppn),.cols = contains("abund"))
 
@@ -206,8 +232,9 @@ trends_rand <- posterior_samples(fit = stanfit__BYM,
          trend_lci = tr_f(lci),
          trend_uci = tr_f(uci),
          trend_se = tr_f(sd),
+         trend_Wci = trend_uci-trend_lci,
          abs_trend = abs(trend))%>% 
-  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend) %>% 
+  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend,trend_Wci) %>% 
   rename_with(.,~paste0(.x,"_rand"),.cols = contains("trend")) 
  
 trends_space <- posterior_samples(fit = stanfit__BYM,
@@ -220,14 +247,32 @@ trends_space <- posterior_samples(fit = stanfit__BYM,
          trend_lci = tr_f(lci),
          trend_uci = tr_f(uci),
          trend_se = tr_f(sd),
+         trend_Wci = trend_uci-trend_lci,
          abs_trend = abs(trend))%>% 
-  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend) %>% 
+  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend,trend_Wci) %>% 
+  rename_with(.,~paste0(.x,"_space"),.cols = contains("trend")) 
+
+
+trends_space_iCAR <- posterior_samples(fit = stanfit_iCAR,
+                                  parm = "beta_space",
+                                  dims = "routeF") %>%
+  posterior_sums(.,
+                 dims = "routeF")%>% 
+  left_join(.,routes_df,by = "routeF") %>% 
+  mutate(trend = tr_f(mean),
+         trend_lci = tr_f(lci),
+         trend_uci = tr_f(uci),
+         trend_se = tr_f(sd),
+         trend_Wci = trend_uci-trend_lci,
+         abs_trend = abs(trend))%>% 
+  select(route,trend,trend_lci,trend_uci,trend_se,abs_trend,trend_Wci) %>% 
   rename_with(.,~paste0(.x,"_space"),.cols = contains("trend")) 
 
 save(list = c("trend_comp",
               "abund_comp",
               "trends_rand",
-              "trends_space"),
+              "trends_space",
+              "trends_space_iCAR"),
      file = "Figures/example_trend_comparison_data.RData")
 
 
