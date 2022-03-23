@@ -138,6 +138,7 @@ trend_long <- NULL
 abund_long <- NULL
 composite_trends_out <- NULL
 trajs_out <- NULL
+
 for(sppn in c("_iCAR","_BYM","_Non_spatial")){
 
   if(sppn == "_iCAR"){stanfit <- stanfit_iCAR}
@@ -320,7 +321,9 @@ save(list = c("trend_comp",
               "abund_comp",
               "trends_rand",
               "trends_space",
-              "trends_space_iCAR"),
+              "trends_space_iCAR",
+              "composite_trends_out",
+              "trajs_out"),
      file = "Figures/example_trend_comparison_data.RData")
 
 
