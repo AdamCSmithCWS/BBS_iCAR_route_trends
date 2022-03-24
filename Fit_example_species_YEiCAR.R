@@ -56,13 +56,12 @@ out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
 
   mod.file = "models/slopeYE_iCAR_route.stan"
     
-    init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
-                                 alpha_raw = rnorm(stan_data$nroutes,0,0.1),
+    init_def <- function(){ list(alpha_raw = rnorm(stan_data$nroutes,0,0.1),
                                  ALPHA = 0,
                                  BETA = 0,
                                  eta = 0,
                                  obs_raw = rnorm(stan_data$nobservers,0,0.1),
-                                 sdnoise = 0.2,
+                                 phi = 5,
                                  sd_year = 0.1,
                                  year_effect_raw = matrix(data = rnorm(n = stan_data$nroutes * stan_data$nyears,
                                                                        0,0.01),

@@ -36,7 +36,6 @@ data {
 }
 
 parameters {
-  vector[ncounts] noise_raw;             // over-dispersion
 
   vector[nroutes] beta_raw_space;
   real BETA; 
@@ -50,7 +49,7 @@ parameters {
   
   vector[nobservers] obs_raw; //observer effects
 
-  real<lower=0> sdnoise;    // sd of over-dispersion
+  real<lower=0> phi;    // inverse over-dispersion
   real<lower=0> sd_year;  //sd of random year effects - same for all routes
  //real<lower=1> nu;  //optional heavy-tail df for t-distribution
   real<lower=0> sdobs;    // sd of observer effects
@@ -69,14 +68,12 @@ model {
  vector[nroutes] beta;
   vector[nroutes] alpha;
   vector[nobservers] obs;
-  vector[ncounts] noise;
-
+  
 // covariate effect on intercepts and slopes
    beta_space = (sdbeta_space*beta_raw_space);
    
    beta = beta_space + BETA;
    alpha = (sdalpha*alpha_raw) + ALPHA;
-   noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
   
   for(r in 1:nroutes){
@@ -89,21 +86,19 @@ model {
     
    real year_effect = sd_year * year_effect_raw[route[i],year[i]];
     
-    E[i] =  beta[route[i]] * (year[i]-fixedyear) + year_effect + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
+    E[i] =  beta[route[i]] * (year[i]-fixedyear) + year_effect + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] ;
   }
   
   
  
   
-  sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
-  noise_raw ~ normal(0,1); //~ student_t(4,0,1); //normal tailed extra Poisson log-normal variance
-  
-  sdobs ~ std_normal(); //prior on sd of gam hyperparameters
+
+  phi ~ gamma(2,0.1); //prior on NBdispersion
  
   obs_raw ~ normal(0,1);//observer effects
   sum(obs_raw) ~ normal(0,0.001*nobservers);
 
-  count ~ poisson_log(E); //vectorized count likelihood with log-transformation
+  count ~ neg_binomial_2_log(E,phi); //vectorized count likelihood with log-transformation
   
   BETA ~ normal(0,0.1);// prior on fixed effect mean slope
   ALPHA ~ normal(0,1);// prior on fixed effect mean intercept
@@ -130,26 +125,24 @@ model {
   vector[nroutes] beta;
   vector[nroutes] alpha;
   vector[nobservers] obs;
-  vector[ncounts] noise;
-
+  
 // intercepts and slopes
    beta_space = (sdbeta_space*beta_raw_space);
    
    beta = beta_space + BETA;
     alpha = (sdalpha*alpha_raw) + ALPHA;
-   noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
 
   for(i in 1:ncounts){
        real year_effect = sd_year * year_effect_raw[route[i],year[i]];
 
-    E[i] =  beta[route[i]] * (year[i]-fixedyear) + year_effect + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i] + noise[i];
+    E[i] =  beta[route[i]] * (year[i]-fixedyear) + year_effect + alpha[route[i]] + obs[observer[i]] + eta*firstyr[i];
   }
   
   
   
   for(i in 1:ncounts){
-  log_lik[i] = poisson_log_lpmf(count[i] | E[i]);
+  log_lik[i] = neg_binomial_2_log_lpmf(count[i] | E[i], phi);
   }
   
 
