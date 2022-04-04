@@ -158,6 +158,166 @@ pdf(file = paste0("Figures/Figure_",f,".pdf"),
 print(fig)
 dev.off()
 
+
+
+# comparing composite trends  ---------------------------------------------
+
+routes_by_strat <- trajs_out %>% 
+  select(route,stratum) %>% 
+  distinct()
+trend_comp_st <- trend_comp %>% 
+  left_join(.,routes_by_strat,by = "route") %>% 
+  group_by(stratum) %>% 
+  summarise(sd_trend_iCAR = sd(trend_iCAR),
+            sd_trend_BYM = sd(trend_BYM),
+            sd_trend_Non_spatial = sd(trend_Non_spatial),
+            min_trend_iCAR = min(trend_iCAR),
+            min_trend_BYM = min(trend_BYM),
+            min_trend_Non_spatial = min(trend_Non_spatial),
+            max_trend_iCAR = max(trend_iCAR),
+            max_trend_BYM = max(trend_BYM),
+            max_trend_Non_spatial = max(trend_Non_spatial),
+            n_routes = n()) %>% 
+  mutate(rng_trend_iCAR = max_trend_iCAR - min_trend_iCAR,
+         rng_trend_BYM = max_trend_BYM - min_trend_BYM,
+         rng_trend_iCA = max_trend_Non_spatial - min_trend_Non_spatial,
+         sd_trend_iCAR = ifelse(is.na(sd_trend_iCAR),0,sd_trend_iCAR))
+
+slope_trends <- read.csv("data/bbsBayes_slope_only_trends_example.csv")
+
+slopet <- slope_trends %>%
+  filter(Region != "Continental") %>% 
+  select(Region,Number_of_Routes,
+         Trend,Trend_Q0.025,Trend_Q0.975,
+         Width_of_95_percent_Credible_Interval) %>% 
+  rename(stratum = Region,
+         n_routes = Number_of_Routes,
+         trend = Trend,
+         trend_lci = Trend_Q0.025,
+         trend_uci = Trend_Q0.975,
+         trend_Wci = Width_of_95_percent_Credible_Interval) %>% 
+  mutate(version = "bbsBayes")
+
+load("data/Stan_slope_stratum_trends.RData")
+
+
+
+comp_trends <- bind_rows(composite_trends_out,
+                         slopet,
+                         trendst)
+
+ciw = ggplot(data = comp_trends,aes(x = n_routes,y = trend_Wci))+
+  geom_point()+
+  facet_wrap(vars(version))
+print(ciw)
+
+comp_t2 = comp_trends %>% 
+  filter(version %in% c("_iCAR","bbsBayes"))
+ciw2 = ggplot(data = comp_t2,aes(x = n_routes,y = trend_Wci,
+                                 colour = version))+
+  geom_point()+
+  scale_colour_viridis_d(guide = guide_legend(title = "Model"))+
+  xlab("Number of routes in stratum")+
+  ylab("Width of stratum trend credible interval")
+
+
+
+ciw3 = ggplot(data = comp_t2,aes(x = n_routes,y = trend,
+                                 colour = version))+
+  geom_point()+
+  scale_colour_viridis_d(guide = guide_legend(title = "Model"))+
+  xlab("Number of routes in stratum")+
+  ylab("Stratum trend estimate")
+
+pdf(file = "Figures/comp_iCAR_bbsBayes_nroutes.pdf")
+print(ciw2)
+print(ciw3)
+dev.off()
+
+comp_t3 = comp_trends %>% 
+  filter(version %in% c("_iCAR","bbsBayes","Stan_slope"))
+
+comp_w <- comp_t3 %>% 
+  select(stratum,trend,trend_Wci,version) %>% 
+  pivot_wider(names_from = version,
+              values_from = c(trend,trend_Wci)) %>% 
+  left_join(.,trend_comp_st,by = "stratum")
+
+comp_bi <- ggplot(data = comp_w,aes(x = trend__iCAR,
+                                    y = trend_bbsBayes,
+                                    colour = n_routes))+
+  geom_point()+
+  coord_cartesian(xlim = c(-7,6),
+                  ylim = c(-7,6))+
+  scale_colour_viridis_c(direction = -1,
+                         guide = guide_legend(title = "number of routes \nin stratum"))+
+  geom_abline(slope = 1,intercept = 0)+
+  xlab("iCAR composite stratum trend")+
+  ylab("Stratum based model trend")
+
+
+comp_bi2 <- ggplot(data = comp_w,aes(x = trend__iCAR,
+                                     y = trend_bbsBayes,
+                                     colour = sd_trend_iCAR,
+                                     size = (n_routes)))+
+  geom_point(alpha = 0.7)+
+  coord_cartesian(xlim = c(-7,6),
+                  ylim = c(-7,6))+
+  scale_size(range = c(1,6),trans = "sqrt")+
+  scale_colour_viridis_c(direction = 1,
+                         guide = guide_legend(title = "SD among \nroute trends in \nstratum"))+
+  geom_abline(slope = 1,intercept = 0)+
+  xlab("iCAR composite stratum trend")+
+  ylab("Stratum based model trend bbsBayes")
+
+
+
+comp_bi3 <- ggplot(data = comp_w,aes(x = trend__iCAR,
+                                    y = trend_Stan_slope,
+                                    colour = n_routes))+
+  geom_point()+
+  coord_cartesian(xlim = c(-7,6),
+                  ylim = c(-7,6))+
+  scale_colour_viridis_c(direction = -1,
+                         guide = guide_legend(title = "number of routes \nin stratum"))+
+  geom_abline(slope = 1,intercept = 0)+
+  xlab("iCAR composite stratum trend")+
+  ylab("Stratum based model trend Stan")
+
+comp_bi4 <- ggplot(data = comp_w,aes(x = trend__iCAR,
+                                     y = trend_Stan_slope,
+                                     colour = sd_trend_iCAR,
+                                     size = (n_routes)))+
+  geom_point(alpha = 0.7)+
+  coord_cartesian(xlim = c(-7,6),
+                  ylim = c(-7,6))+
+  scale_size(range = c(1,6),trans = "sqrt")+
+  scale_colour_viridis_c(direction = 1,
+                         guide = guide_legend(title = "SD among \nroute trends in \nstratum"))+
+  geom_abline(slope = 1,intercept = 0)+
+  xlab("iCAR composite stratum trend")+
+  ylab("Stratum based model trend Stan")+
+  theme_bw()
+
+pdf(file = "Figures/Strata_trends_iCAR_vs_stratum.pdf")
+print(comp_bi)
+print(comp_bi3)
+print(comp_bi2)
+print(comp_bi4)
+dev.off()
+
+
+comp_CV_bi <- ggplot(data = comp_w,aes(x = trend_Wci__iCAR,
+                                    y = trend_Wci_bbsBayes,
+                                    colour = sd_trend_iCAR))+
+  geom_point()+
+  scale_colour_viridis_c(guide = guide_legend(title = "variation among \nroute trends in \nstratum"))+
+  geom_abline(slope = 1,intercept = 0)+
+  xlab("iCAR model - composite trend across all routes")+
+  ylab("Stratum based model")
+print(comp_CV_bi)
+
+
 # 4 ABundance correlations among models -----------------------------------
 
 

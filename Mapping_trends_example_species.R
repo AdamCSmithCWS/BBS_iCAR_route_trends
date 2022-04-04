@@ -27,7 +27,7 @@ firstYear = 2004
 lastYear = 2019
 
 scope = "RangeWide"
-check_conv = TRUE #set to TRUE to run convergence summary
+check_conv = FALSE #set to TRUE to run convergence summary
 conv_summary <- NULL
 
 species = "Blue-headed Vireo"
