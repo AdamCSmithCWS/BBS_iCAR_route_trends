@@ -5,13 +5,12 @@
 
 
 //iCAR function
-functions {
-  real icar_normal_lpdf(vector bb, int nroutes, int[] node1, int[] node2) {
-    return -0.5 * dot_self(bb[node1] - bb[node2])
-      + normal_lpdf(sum(bb) | 0, 0.001 * nroutes); //soft sum to zero constraint on bb
+ functions {
+   real icar_normal_lpdf(vector bb, int ns, array[] int n1, array[] int n2) {
+     return -0.5 * dot_self(bb[n1] - bb[n2])
+       + normal_lpdf(sum(bb) | 0, 0.001 * ns); //soft sum to zero constraint on bb
+  }
  }
-}
-
 
 data {
   int<lower=1> nroutes;
@@ -19,18 +18,18 @@ data {
   int<lower=1> nyears;
   int<lower=1> nobservers;
  
-  int<lower=0> count[ncounts];              // count observations
-  int<lower=1> year[ncounts]; // year index
-  int<lower=1> route[ncounts]; // route index
-  int<lower=0> firstyr[ncounts]; // first year index
-  int<lower=1> observer[ncounts];              // observer indicators
+  array [ncounts] int<lower=0> count;              // count observations
+  array [ncounts] int<lower=1> year; // year index
+  array [ncounts] int<lower=1> route; // route index
+  array [ncounts] int<lower=0> firstyr; // first year index
+  array [ncounts] int<lower=1> observer;              // observer indicators
 
   int<lower=1> fixedyear; // centering value for years
  
  // spatial neighbourhood information
   int<lower=1> N_edges;
-  int<lower=1, upper=nroutes> node1[N_edges];  // node1[i] adjacent to node2[i]
-  int<lower=1, upper=nroutes> node2[N_edges];  // and node1[i] < node2[i]
+  array [N_edges] int<lower=1, upper=nroutes> node1;  // node1[i] adjacent to node2[i]
+  array [N_edges] int<lower=1, upper=nroutes> node2;  // and node1[i] < node2[i]
 
 
 }

@@ -1,20 +1,17 @@
 ## building a BYM route-level trend model for the BBS
-
+#setwd("C:/GitHub/BBS_iCAR_route_trends")
 library(bbsBayes)
 library(tidyverse)
 library(cmdstanr)
-# library(rstan)
-# rstan_options(auto_write = TRUE, javascript = FALSE)
-# library(shinystan)
-library(sf)
-library(spdep)
+#  library(sf)
+# library(spdep)
 # library(doParallel)
 # library(foreach)
  library(ggforce)
 #library(tidybayes)
 #source("functions/mungeCARdata4stan.R")
-source("functions/neighbours_define_alt.R") ## function to define neighbourhood relationships
-source("functions/prepare-jags-data-alt.R") ## small alteration of the bbsBayes function
+source("functions/neighbours_define.R") ## function to define neighbourhood relationships
+source("functions/prepare-data-alt.R") ## small alteration of the bbsBayes function
 source("functions/get_basemap_function.R") ## loads one of the bbsBayes strata maps
 source("functions/posterior_summary_functions.R") ## functions similar to tidybayes that work on cmdstanr output
 ## changes captured in a commit on Nov 20, 2020
@@ -22,49 +19,52 @@ source("functions/posterior_summary_functions.R") ## functions similar to tidyba
 
 # load and stratify CASW data ---------------------------------------------
 #species = "Pacific Wren"
-#species = "Barred Owl"
 strat = "bbs_usgs"
 model = "slope"
 
-strat_data = stratify(by = strat)
 
-firstYear = 2004
-lastYear = 2019
+firstYear = 1995
+lastYear = 2021
 
-scope = "RangeWide"
-
-species = "Eurasian Collared-Dove"
 species = "Blue-headed Vireo"
 #species = "Dickcissel"
+
+species_f <- gsub(gsub(species,pattern = " ",replacement = "_",fixed = T),pattern = "'",replacement = "",fixed = T)
+
+spp <- "_BYM_"
+
+out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
+
+
+# SPECIES LOOP ------------------------------------------------------------
+
 output_dir <- "output"
-species_f <- gsub(species,pattern = " ",replacement = "_",fixed = T)
 
- 
-  sp_file <- paste0(output_dir,"/",species_f,"_",firstYear,"_",lastYear,"_stan_data.RData")
- 
- jags_data = prepare_jags_data(strat_data = strat_data,
-                             species_to_run = species,
-                             model = model,
-                             #n_knots = 10,
-                             min_year = firstYear,
-                             max_year = lastYear,
-                             min_n_routes = 1)# spatial neighbourhood define --------------------------------------------
 
- jags_data = bbsBayes::prepare_data(strat_data = strat_data,
-                               species_to_run = species,
-                               model = model,
-                               #n_knots = 10,
-                               min_year = firstYear,
-                               max_year = lastYear,
-                               min_n_routes = 1)# spatial neighbourhood define --------------------------------------------
- 
- # strata map of one of the bbsBayes base maps
- # helps group and set boundaries for the route-level neighbours
-  strata_map  <- get_basemap(strata_type = strat,
-                         transform_laea = TRUE,
-                         append_area_weights = FALSE)
- 
- 
+
+
+
+sp_data_file <- paste0(output_dir,"/",species_f,"_",firstYear,"_",lastYear,"_stan_data.RData")
+
+
+strat_data <- stratify(by = strat)
+
+
+jags_data = prepare_data(strat_data = strat_data,
+                              species_to_run = species,
+                              model = model,
+                              #n_knots = 10,
+                              min_year = firstYear,
+                              max_year = lastYear,
+                              min_n_routes = 1)# spatial neighbourhood define --------------------------------------------
+
+# strata map of one of the bbsBayes base maps
+# helps group and set boundaries for the route-level neighbours
+strata_map  <- get_basemap(strata_type = strat,
+                           transform_laea = TRUE,
+                           append_area_weights = FALSE)
+
+
 realized_strata_map = filter(strata_map,ST_12 %in% unique(jags_data$strat_name))
 
 # Spatial boundaries set up --------------------
@@ -87,6 +87,7 @@ strata_bounds_buf = st_buffer(strata_bounds,dist = 300000) #buffering the realis
 
 jags_data[["routeF"]] <- as.integer(factor((jags_data$route)))
 
+#create a data frame of each unique route in the species-specific dataset
 route_map = unique(data.frame(route = jags_data$route,
                               routeF = jags_data$routeF,
                               strat = jags_data$strat_name,
@@ -112,31 +113,29 @@ dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
 if(length(dups) > 0){stop(paste(spec,"ERROR - At least one duplicate route remains"))}
 
 
+#create spatial object from route_map dataframe
 route_map = st_as_sf(route_map,coords = c("Longitude","Latitude"))
 st_crs(route_map) <- 4269 #NAD83 commonly used by US federal agencies
-#load strata map
 
-
-
-
+#reconcile the projections
 route_map = st_transform(route_map,crs = st_crs(realized_strata_map))
 
 
 ## returns the adjacency data necessary for the stan model
 ## also exports maps and saved data objects to plot_dir
 car_stan_dat <- neighbours_define(real_strata_map = route_map,
-                  #strat_link_fill = 100000,
-                  plot_neighbours = TRUE,
-                  species = species,
-                  plot_dir = "data/",
-                  plot_file = paste0("_",scope,"_route_maps"),
-                  save_plot_data = TRUE,
-                  voronoi = TRUE,
-                  alt_strat = "routeF",
-                  add_map = realized_strata_map)
+                                  #strat_link_fill = 100000,
+                                  plot_neighbours = TRUE,
+                                  species = species,
+                                  plot_dir = "data/",
+                                  plot_file = paste0("_",firstYear,"_",lastYear,"_route_maps"),
+                                  save_plot_data = TRUE,
+                                  voronoi = TRUE,
+                                  strat_indicator = "routeF",
+                                  add_map = realized_strata_map)
 
 
- 
+
 
 
 
@@ -169,7 +168,48 @@ save(list = c("stan_data",
               "route_map",
               "realized_strata_map",
               "firstYear"),
-     file = sp_file)
+     file = sp_data_file)
 
+
+
+
+
+
+  mod.file = "models/slope_BYM_route.stan"
+  
+  init_def <- function(){ list(noise_raw = rnorm(stan_data$ncounts,0,0.1),
+                               alpha_raw = rnorm(stan_data$nroutes,0,0.1),
+                               sdalpha = runif(1,0.01,0.1),
+                               ALPHA = 0,
+                               BETA = 0,
+                               eta = 0,
+                               obs_raw = rnorm(stan_data$nobservers,0,0.1),
+                               sdnoise = 0.2,
+                               sdobs = 0.1,
+                               sdbeta_rand = runif(1,0.01,0.1),
+                               beta_raw_rand = rnorm(stan_data$nroutes,0,0.01),
+                               sdbeta_space = runif(1,0.01,0.1),
+                               beta_raw_space = rnorm(stan_data$nroutes,0,0.01))} 
+
+
+
+slope_model <- cmdstan_model(mod.file, stanc_options = list("O1"))
+
+slope_stanfit <- slope_model$sample(
+  data=stan_data,
+  refresh=200,
+  chains=3, iter_sampling=1000,
+  iter_warmup=1000,
+  parallel_chains = 3,
+  #pars = parms,
+  adapt_delta = 0.8,
+  max_treedepth = 14,
+  seed = 123,
+  init = init_def,
+  output_dir = output_dir,
+  output_basename = out_base)
+
+
+}
 
 
